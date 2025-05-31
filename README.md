@@ -382,7 +382,6 @@ geocoder/
 ├── migrations/                     # SQL migration files
 ├── web/                            # Admin dashboard frontend
 ├── docker-compose.yml              # Development environment
-├── docker-compose.prod.yml         # Production environment
 ├── Dockerfile                      # Production multi-stage build
 └── .env.example                    # Environment variable template
 ```
