@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Map - Geocoder API</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .test-form input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .test-form button {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .test-form button:hover {
+            background: #2980b9;
+        }
+        .response {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .error {
+            background: #ffe6e6;
+            color: #c0392b;
+        }
+        .success {
+            background: #e8f5e8;
+            color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ Geocoder API Test Interface</h1>
+        <p>Use this page to test geocoding and IP geolocation requests. Open the <a href="/admin/dashboard" target="_blank">admin dashboard</a> in another tab to see the real-time map updates.</p>
+        
+        <div class="test-panel">
+            <h3>Geocoding Test</h3>
+            <p>Enter an address to geocode:</p>
+            <div class="test-form">
+                <input type="text" id="geocode-address" placeholder="1600 Amphitheatre Parkway, Mountain View, CA" value="1600 Amphitheatre Parkway, Mountain View, CA">
+                <input type="text" id="geocode-key" placeholder="API Key" value="">
+                <button onclick="testGeocode()">Geocode</button>
+            </div>
+            <div id="geocode-response" class="response" style="display: none;"></div>
+        </div>
+        
+        <div class="test-panel">
+            <h3>IP Geolocation Test</h3>
+            <p>Enter an IP address to geolocate:</p>
+            <div class="test-form">
+                <input type="text" id="geoip-ip" placeholder="8.8.8.8" value="8.8.8.8">
+                <input type="text" id="geoip-key" placeholder="API Key" value="">
+                <button onclick="testGeoIP()">Geolocate</button>
+            </div>
+            <div id="geoip-response" class="response" style="display: none;"></div>
+        </div>
+        
+        <div class="test-panel">
+            <h3>Multiple Requests Test</h3>
+            <p>Send multiple requests to different locations to test map zoom behavior:</p>
+            <div class="test-form">
+                <input type="text" id="multi-key" placeholder="API Key" value="">
+                <button onclick="testMultipleLocations()">Send Multiple Requests</button>
+            </div>
+            <div id="multi-response" class="response" style="display: none;"></div>
+        </div>
+        
+        <div class="test-panel">
+            <h3>Test Locations</h3>
+            <p>Quick test buttons for common locations:</p>
+            <button onclick="quickTest('New York, NY')">New York</button>
+            <button onclick="quickTest('London, UK')">London</button>
+            <button onclick="quickTest('Tokyo, Japan')">Tokyo</button>
+            <button onclick="quickTest('Sydney, Australia')">Sydney</button>
+            <button onclick="quickTestIP('8.8.8.8')">Google DNS</button>
+            <button onclick="quickTestIP('1.1.1.1')">Cloudflare DNS</button>
+        </div>
+    </div>
+
+    <script>
+        // Load API key from localStorage if available
+        const savedKey = localStorage.getItem('geocoder-api-key');
+        if (savedKey) {
+            document.getElementById('geocode-key').value = savedKey;
+            document.getElementById('geoip-key').value = savedKey;
+            document.getElementById('multi-key').value = savedKey;
+        }
+
+        function saveApiKey(key) {
+            if (key) {
+                localStorage.setItem('geocoder-api-key', key);
+            }
+        }
+
+        function showResponse(elementId, response, isError = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = JSON.stringify(response, null, 2);
+            element.className = isError ? 'response error' : 'response success';
+            element.style.display = 'block';
+        }
+
+        async function testGeocode() {
+            const address = document.getElementById('geocode-address').value;
+            const key = document.getElementById('geocode-key').value;
+            
+            if (!address || !key) {
+                showResponse('geocode-response', {error: 'Please enter both address and API key'}, true);
+                return;
+            }
+            
+            saveApiKey(key);
+            
+            try {
+                const url = `/v1/geocode?address=${encodeURIComponent(address)}&key=${encodeURIComponent(key)}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                showResponse('geocode-response', data, !response.ok);
+            } catch (error) {
+                showResponse('geocode-response', {error: error.message}, true);
+            }
+        }
+
+        async function testGeoIP() {
+            const ip = document.getElementById('geoip-ip').value;
+            const key = document.getElementById('geoip-key').value;
+            
+            if (!ip || !key) {
+                showResponse('geoip-response', {error: 'Please enter both IP and API key'}, true);
+                return;
+            }
+            
+            saveApiKey(key);
+            
+            try {
+                const url = `/v1/geoip?ip=${encodeURIComponent(ip)}&key=${encodeURIComponent(key)}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                showResponse('geoip-response', data, !response.ok);
+            } catch (error) {
+                showResponse('geoip-response', {error: error.message}, true);
+            }
+        }
+
+        async function testMultipleLocations() {
+            const key = document.getElementById('multi-key').value;
+            
+            if (!key) {
+                showResponse('multi-response', {error: 'Please enter API key'}, true);
+                return;
+            }
+            
+            saveApiKey(key);
+            
+            const locations = [
+                'San Francisco, CA',
+                'New York, NY', 
+                'London, UK',
+                'Tokyo, Japan',
+                'Sydney, Australia'
+            ];
+            
+            const ips = ['8.8.8.8', '1.1.1.1'];
+            
+            let results = [];
+            
+            try {
+                showResponse('multi-response', {status: 'Sending requests...', results: []});
+                
+                // Send geocoding requests with delays
+                for (let i = 0; i < locations.length; i++) {
+                    const address = locations[i];
+                    const url = `/v1/geocode?address=${encodeURIComponent(address)}&key=${encodeURIComponent(key)}`;
+                    
+                    try {
+                        const response = await fetch(url);
+                        const data = await response.json();
+                        results.push({type: 'geocode', address, status: response.status, data});
+                    } catch (error) {
+                        results.push({type: 'geocode', address, error: error.message});
+                    }
+                    
+                    // Update display
+                    showResponse('multi-response', {status: `Sent ${i + 1}/${locations.length + ips.length} requests`, results});
+                    
+                    // Wait 2 seconds between requests to see map zoom behavior
+                    if (i < locations.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+                }
+                
+                // Wait before sending IP requests
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Send IP geolocation requests
+                for (let i = 0; i < ips.length; i++) {
+                    const ip = ips[i];
+                    const url = `/v1/geoip?ip=${encodeURIComponent(ip)}&key=${encodeURIComponent(key)}`;
+                    
+                    try {
+                        const response = await fetch(url);
+                        const data = await response.json();
+                        results.push({type: 'geoip', ip, status: response.status, data});
+                    } catch (error) {
+                        results.push({type: 'geoip', ip, error: error.message});
+                    }
+                    
+                    // Update display
+                    showResponse('multi-response', {status: `Sent ${locations.length + i + 1}/${locations.length + ips.length} requests`, results});
+                    
+                    if (i < ips.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+                }
+                
+                showResponse('multi-response', {status: 'Completed all requests', results});
+                
+            } catch (error) {
+                showResponse('multi-response', {error: error.message, results}, true);
+            }
+        }
+
+        async function quickTest(address) {
+            document.getElementById('geocode-address').value = address;
+            await testGeocode();
+        }
+
+        async function quickTestIP(ip) {
+            document.getElementById('geoip-ip').value = ip;
+            await testGeoIP();
+        }
+
+        // Add Enter key support
+        document.getElementById('geocode-address').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') testGeocode();
+        });
+        
+        document.getElementById('geocode-key').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') testGeocode();
+        });
+        
+        document.getElementById('geoip-ip').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') testGeoIP();
+        });
+        
+        document.getElementById('geoip-key').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') testGeoIP();
+        });
+    </script>
+</body>
+</html>

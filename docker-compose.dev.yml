@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  geocoder:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["air", "-c", ".air.toml"]
+    volumes:
+      - .:/app
+      - go_mod_cache:/go/pkg/mod
+    working_dir: /app
+    environment:
+      - CGO_ENABLED=0
+
+volumes:
+  go_mod_cache:

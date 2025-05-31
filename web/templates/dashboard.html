@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geocoder Admin Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card h3 {
+            color: #666;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c3e50;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card .value.updating {
+            transform: scale(1.05);
+            color: #3498db;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .section-header {
+            background: #34495e;
+            color: white;
+            padding: 1rem 1.5rem;
+            font-weight: 600;
+        }
+        
+        .section-content {
+            padding: 1.5rem;
+        }
+        
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+        
+        .api-keys-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .api-key-item {
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .api-key-item:last-child {
+            border-bottom: none;
+        }
+        
+        .api-key-info h4 {
+            margin: 0;
+            color: #2c3e50;
+        }
+        
+        .api-key-info .meta {
+            font-size: 0.875rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+        
+        .status-active {
+            color: #27ae60;
+            font-weight: 600;
+        }
+        
+        .status-inactive {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            text-decoration: none;
+            display: inline-block;
+            margin: 0 0.25rem;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        
+        .legend {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .legend-marker {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .marker-cache-hit { background: #27ae60; }
+        .marker-cache-miss { background: #e74c3c; }
+        .marker-geoip { background: #3498db; }
+        
+        .new-key-display {
+            background: #f8f9fa;
+            border: 2px solid #27ae60;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        .new-key-header h4 {
+            color: #27ae60;
+            margin: 0 0 0.5rem 0;
+        }
+        
+        .new-key-warning {
+            color: #e67e22;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        
+        .new-key-content {
+            margin: 1rem 0;
+        }
+        
+        .key-field {
+            margin-bottom: 0.75rem;
+        }
+        
+        .key-field label {
+            display: inline-block;
+            width: 80px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .key-copy-container {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.25rem;
+        }
+        
+        .key-input {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.875rem;
+        }
+        
+        .btn-copy {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            min-width: 80px;
+        }
+        
+        .btn-copy:hover {
+            background: #2980b9;
+        }
+        
+        .btn-copy.copied {
+            background: #27ae60;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .activity-log {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        
+        .activity-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background-color 0.2s;
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .activity-item.new-activity {
+            background-color: #e8f5e8;
+            animation: highlightActivity 2s ease-out;
+        }
+        
+        @keyframes highlightActivity {
+            0% { background-color: #27ae60; }
+            100% { background-color: transparent; }
+        }
+        
+        .activity-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.75rem;
+            margin-right: 0.75rem;
+            flex-shrink: 0;
+        }
+        
+        .activity-icon.geocode { background: #3498db; }
+        .activity-icon.geoip { background: #9b59b6; }
+        .activity-icon.cache { background: #27ae60; }
+        
+        .activity-details {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .activity-query {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.25rem;
+            word-break: break-word;
+        }
+        
+        .activity-meta {
+            font-size: 0.75rem;
+            color: #7f8c8d;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .activity-timestamp {
+            font-size: 0.75rem;
+            color: #95a5a6;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🗺️ Geocoder Admin Dashboard</h1>
+    </div>
+    
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Requests</h3>
+                <div class="value" id="total-requests">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Cache Hit Rate</h3>
+                <div class="value" id="cache-hit-rate">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Active API Keys</h3>
+                <div class="value" id="active-keys">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Today's Requests</h3>
+                <div class="value" id="todays-requests">-</div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="section">
+                <div class="section-header">Real-time Request Map</div>
+                <div class="section-content">
+                    <div id="map"></div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-marker marker-cache-hit"></div>
+                            <span>Geocode Cache Hit</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-marker marker-cache-miss"></div>
+                            <span>Geocode Cache Miss</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-marker marker-geoip"></div>
+                            <span>IP Geolocation</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-header">API Keys</div>
+                <div class="section-content">
+                    <div id="api-keys-list" class="api-keys-list">
+                        <!-- API keys will be loaded here -->
+                    </div>
+                    <hr style="margin: 1rem 0;">
+                    <h4>Create New API Key</h4>
+                    
+                    <!-- New API Key Display -->
+                    <div id="new-api-key-display" class="new-key-display" style="display: none;">
+                        <div class="new-key-header">
+                            <h4>✅ API Key Created Successfully!</h4>
+                            <span class="new-key-warning">⚠️ Save this key now - it won't be shown again</span>
+                        </div>
+                        <div class="new-key-content">
+                            <div class="key-field">
+                                <label>Name:</label>
+                                <span id="new-key-name"></span>
+                            </div>
+                            <div class="key-field">
+                                <label>Owner:</label>
+                                <span id="new-key-owner"></span>
+                            </div>
+                            <div class="key-field">
+                                <label>App:</label>
+                                <span id="new-key-app"></span>
+                            </div>
+                            <div class="key-field">
+                                <label>Environment:</label>
+                                <span id="new-key-environment"></span>
+                            </div>
+                            <div class="key-field">
+                                <label>API Key:</label>
+                                <div class="key-copy-container">
+                                    <input type="text" id="new-key-value" readonly class="key-input">
+                                    <button type="button" id="copy-key-btn" class="btn btn-copy">Copy</button>
+                                </div>
+                            </div>
+                            <div class="key-field">
+                                <label>Rate Limit:</label>
+                                <span id="new-key-rate-limit"></span> requests/second
+                            </div>
+                        </div>
+                        <button type="button" id="close-new-key" class="btn btn-primary">Got it</button>
+                    </div>
+                    
+                    <form id="create-key-form">
+                        <div class="form-group">
+                            <label for="key-owner">Hack Club Staff Username</label>
+                            <input type="text" id="key-owner" required placeholder="e.g., zrl">
+                        </div>
+                        <div class="form-group">
+                            <label for="key-app-name">App Name</label>
+                            <input type="text" id="key-app-name" required placeholder="e.g., spotcheck">
+                        </div>
+                        <div class="form-group">
+                            <label for="key-environment">Environment</label>
+                            <select id="key-environment" required>
+                                <option value="">Select environment</option>
+                                <option value="dev">dev (local laptop)</option>
+                                <option value="staging">staging</option>
+                                <option value="prod">prod (deployed app)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="key-prefix">Prefix</label>
+                            <input type="text" id="key-prefix" value="hc" required maxlength="10">
+                        </div>
+                        <div class="form-group">
+                            <label for="rate-limit">Rate Limit (per second)</label>
+                            <input type="number" id="rate-limit" value="10" min="1" max="1000">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create API Key</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-header">Recent Activity</div>
+                <div class="section-content">
+                    <div id="activity-log" class="activity-log">
+                        <!-- Activity log will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([39.8283, -98.5795], 4); // Center on USA
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // WebSocket connection
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${wsProtocol}//${window.location.host}/admin/ws`);
+        
+        const markers = new Map();
+        let recentMarkers = []; // Track recent markers for zoom bounds
+        let lastZoomTime = 0;
+        
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'stats_update') {
+                // Update stats in real-time
+                updateStatsDisplay(data.stats);
+            } else if (data.type === 'activity_update') {
+                // Add new activity to the log
+                addNewActivityItem(data.activity);
+            } else if (data.type === 'geocode_request' || data.type === 'geoip_request') {
+                // Handle map updates
+                let color = '#3498db'; // Default blue
+                let endpoint = data.endpoint || (data.type === 'geocode_request' ? 'v1/geocode' : 'v1/geoip');
+                
+                if (endpoint === 'v1/geocode') {
+                    color = data.cache_hit ? '#27ae60' : '#e74c3c'; // Green for hit, red for miss
+                }
+                
+                const marker = L.circleMarker([data.lat, data.lng], {
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.7,
+                    radius: 8
+                }).addTo(map);
+                
+                const popupContent = `
+                    <strong>${endpoint}</strong><br>
+                    ${data.address ? `Address: ${data.address}<br>` : ''}
+                    ${data.ip ? `IP: ${data.ip}<br>` : ''}
+                    Cache: ${data.cache_hit ? 'Hit' : 'Miss'}<br>
+                    Time: ${new Date(data.timestamp).toLocaleTimeString()}
+                `;
+                marker.bindPopup(popupContent);
+                
+                // Add to recent markers for zoom calculation
+                recentMarkers.push({
+                    marker: marker,
+                    lat: data.lat,
+                    lng: data.lng,
+                    timestamp: Date.now()
+                });
+                
+                // Zoom to the new location with smart bounds
+                zoomToRecentActivity();
+                
+                // Remove marker after 30 seconds
+                setTimeout(() => {
+                    map.removeLayer(marker);
+                    // Remove from recent markers array
+                    recentMarkers = recentMarkers.filter(m => m.marker !== marker);
+                }, 30000);
+            }
+        };
+        
+        function zoomToRecentActivity() {
+            const now = Date.now();
+            const recentTimeWindow = 10000; // 10 seconds
+            const minZoomInterval = 3000; // Don't zoom more than once every 3 seconds
+            
+            // Filter to only recent markers (last 10 seconds)
+            const activeMarkers = recentMarkers.filter(m => now - m.timestamp < recentTimeWindow);
+            
+            if (activeMarkers.length === 0 || now - lastZoomTime < minZoomInterval) {
+                return;
+            }
+            
+            if (activeMarkers.length === 1) {
+                // Single marker - zoom to it with appropriate zoom level
+                const marker = activeMarkers[0];
+                map.setView([marker.lat, marker.lng], Math.max(map.getZoom(), 8), {
+                    animate: true,
+                    duration: 1.0
+                });
+            } else {
+                // Multiple markers - fit bounds to show all recent activity
+                const group = new L.featureGroup(activeMarkers.map(m => m.marker));
+                map.fitBounds(group.getBounds(), {
+                    padding: [20, 20],
+                    maxZoom: 10,
+                    animate: true,
+                    duration: 1.0
+                });
+            }
+            
+            lastZoomTime = now;
+        }
+        
+        // Load stats
+        function loadStats() {
+            fetch('/admin/stats')
+                .then(response => response.json())
+                .then(data => {
+                    updateStatsDisplay(data);
+                })
+                .catch(error => console.error('Error loading stats:', error));
+        }
+        
+        // Update stats display (used for both initial load and real-time updates)
+        function updateStatsDisplay(stats) {
+            // Add animation class for visual feedback
+            const statCards = document.querySelectorAll('.stat-card .value');
+            statCards.forEach(card => {
+                card.classList.add('updating');
+                setTimeout(() => card.classList.remove('updating'), 300);
+            });
+            
+            // Update the values
+            document.getElementById('total-requests').textContent = stats.total_requests.toLocaleString();
+            document.getElementById('cache-hit-rate').textContent = stats.cache_hit_rate.toFixed(1) + '%';
+            document.getElementById('active-keys').textContent = stats.active_api_keys;
+            document.getElementById('todays-requests').textContent = stats.todays_requests.toLocaleString();
+        }
+        
+        // Load API keys
+        function loadAPIKeys() {
+            fetch('/admin/keys')
+                .then(response => response.json())
+                .then(keys => {
+                    const container = document.getElementById('api-keys-list');
+                    container.innerHTML = '';
+                    
+                    keys.forEach(key => {
+                        const item = document.createElement('div');
+                        item.className = 'api-key-item';
+                        
+                        const statusClass = key.is_active ? 'status-active' : 'status-inactive';
+                        const statusText = key.is_active ? 'Active' : 'Inactive';
+                        
+                        item.innerHTML = `
+                            <div class="api-key-info">
+                                <h4>${key.name}</h4>
+                                <div class="meta">
+                                    <span class="${statusClass}">${statusText}</span> • 
+                                    ${key.rate_limit_per_second}/sec • 
+                                    ${key.request_count} requests
+                                    ${key.owner ? `<br><strong>Owner:</strong> ${key.owner} • <strong>App:</strong> ${key.app_name} • <strong>Env:</strong> ${key.environment}` : ''}
+                                </div>
+                            </div>
+                            <div>
+                                ${key.is_active ? `<button class="btn btn-danger" onclick="deactivateKey('${key.id}')">Deactivate</button>` : ''}
+                            </div>
+                        `;
+                        
+                        container.appendChild(item);
+                    });
+                })
+                .catch(error => console.error('Error loading API keys:', error));
+        }
+        
+        // Create API key
+        document.getElementById('create-key-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const owner = document.getElementById('key-owner').value;
+            const appName = document.getElementById('key-app-name').value;
+            const environment = document.getElementById('key-environment').value;
+            
+            // Generate random suffix for unique naming
+            const randomSuffix = Math.random().toString(36).substring(2, 10);
+            const name = `${owner}_${appName}_${environment}_${randomSuffix}`;
+            
+            const data = {
+                name: name,
+                owner: owner,
+                app_name: appName,
+                environment: environment,
+                prefix: document.getElementById('key-prefix').value,
+                rate_limit_per_second: parseInt(document.getElementById('rate-limit').value)
+            };
+            
+            fetch('/admin/keys', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                // Show the new API key in the custom display
+                showNewAPIKey(result);
+                document.getElementById('create-key-form').reset();
+                loadAPIKeys();
+            })
+            .catch(error => {
+                console.error('Error creating API key:', error);
+                alert('Failed to create API key');
+            });
+        });
+        
+        // Show new API key display
+        function showNewAPIKey(keyData) {
+            document.getElementById('new-key-name').textContent = keyData.name;
+            document.getElementById('new-key-owner').textContent = keyData.owner;
+            document.getElementById('new-key-app').textContent = keyData.app_name;
+            document.getElementById('new-key-environment').textContent = keyData.environment;
+            document.getElementById('new-key-value').value = keyData.key;
+            document.getElementById('new-key-rate-limit').textContent = keyData.rate_limit_per_second;
+            
+            const display = document.getElementById('new-api-key-display');
+            display.style.display = 'block';
+            display.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        // Copy API key to clipboard
+        document.getElementById('copy-key-btn').addEventListener('click', function() {
+            const keyInput = document.getElementById('new-key-value');
+            keyInput.select();
+            keyInput.setSelectionRange(0, 99999); // For mobile devices
+            
+            navigator.clipboard.writeText(keyInput.value).then(function() {
+                const btn = document.getElementById('copy-key-btn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                
+                setTimeout(function() {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(function(err) {
+                // Fallback for older browsers
+                keyInput.select();
+                document.execCommand('copy');
+                
+                const btn = document.getElementById('copy-key-btn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                
+                setTimeout(function() {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        });
+        
+        // Close new API key display
+        document.getElementById('close-new-key').addEventListener('click', function() {
+            document.getElementById('new-api-key-display').style.display = 'none';
+        });
+        
+        // Deactivate API key
+        function deactivateKey(keyId) {
+            if (confirm('Are you sure you want to deactivate this API key?')) {
+                fetch(`/admin/keys/${keyId}`, {
+                    method: 'DELETE'
+                })
+                .then(() => {
+                    loadAPIKeys();
+                })
+                .catch(error => {
+                    console.error('Error deactivating API key:', error);
+                    alert('Failed to deactivate API key');
+                });
+            }
+        }
+        
+        // Load activity log
+        function loadActivityLog() {
+            fetch('/admin/activity')
+                .then(response => response.json())
+                .then(activities => {
+                    const container = document.getElementById('activity-log');
+                    container.innerHTML = '';
+                    
+                    if (!activities || activities.length === 0) {
+                        container.innerHTML = '<div style="padding: 1rem; text-align: center; color: #7f8c8d;">No recent activity</div>';
+                        return;
+                    }
+                    
+                    activities.forEach(activity => {
+                        const item = createActivityItem(activity);
+                        container.appendChild(item);
+                    });
+                })
+                .catch(error => console.error('Error loading activity log:', error));
+        }
+        
+        function createActivityItem(activity) {
+            const item = document.createElement('div');
+            item.className = 'activity-item';
+            
+            const isGeocode = activity.endpoint === 'v1/geocode';
+            const iconClass = activity.cache_hit ? 'cache' : (isGeocode ? 'geocode' : 'geoip');
+            const iconText = activity.cache_hit ? '⚡' : (isGeocode ? 'GEO' : 'IP');
+            
+            const timestamp = new Date(activity.timestamp);
+            const timeStr = timestamp.toLocaleTimeString();
+            const dateStr = timestamp.toLocaleDateString();
+            
+            item.innerHTML = `
+                <div class="activity-icon ${iconClass}">${iconText}</div>
+                <div class="activity-details">
+                    <div class="activity-query">${activity.query_text}</div>
+                    <div class="activity-meta">
+                        <span><strong>${activity.api_key_name}</strong></span>
+                        <span>${activity.api_source} API</span>
+                        <span>${activity.result_count} result${activity.result_count !== 1 ? 's' : ''}</span>
+                        <span>${activity.response_time_ms}ms</span>
+                    </div>
+                </div>
+                <div class="activity-timestamp">${timeStr}<br>${dateStr}</div>
+            `;
+            
+            return item;
+        }
+        
+        function addNewActivityItem(activity) {
+            const container = document.getElementById('activity-log');
+            const item = createActivityItem(activity);
+            item.classList.add('new-activity');
+            
+            // If there's a "no activity" message, remove it
+            if (container.children.length === 1 && container.children[0].textContent.includes('No recent activity')) {
+                container.innerHTML = '';
+            }
+            
+            // Add new item at the top
+            container.insertBefore(item, container.firstChild);
+            
+            // Keep only the latest 100 items
+            while (container.children.length > 100) {
+                container.removeChild(container.lastChild);
+            }
+            
+            // Remove highlight after animation
+            setTimeout(() => item.classList.remove('new-activity'), 2000);
+        }
+
+        // Load initial data
+        loadStats();
+        loadAPIKeys();
+        loadActivityLog();
+        
+        // Refresh stats every 5 minutes (since we have real-time updates via WebSocket)
+        setInterval(loadStats, 300000);
+        
+        // Refresh API keys every 2 minutes
+        setInterval(loadAPIKeys, 120000);
+    </script>
+</body>
+</html>

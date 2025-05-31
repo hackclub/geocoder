@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: geocoder
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - geocoder_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d geocoder"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  geocoder:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgres://user:pass@postgres:5432/geocoder?sslmode=disable
+      GOOGLE_GEOCODING_API_KEY: ${GOOGLE_GEOCODING_API_KEY:-}
+      IPINFO_API_KEY: ${IPINFO_API_KEY:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      MAX_ADDRESS_CACHE_SIZE: 10000
+      MAX_IP_CACHE_SIZE: 5000
+      DEFAULT_RATE_LIMIT_PER_SECOND: 10
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  geocoder_postgres_data:
