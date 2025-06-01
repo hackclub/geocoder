@@ -6,10 +6,10 @@
 *.dylib
 bin/
 tmp/
-main
-keygen
-migrate
-server
+/main
+/keygen
+/migrate
+/server
 
 # Test binary, built with `go test -c`
 *.test

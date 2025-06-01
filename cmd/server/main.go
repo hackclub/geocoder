@@ -93,8 +93,8 @@ func main() {
 	// Test interface for map functionality
 	router.HandleFunc("/test", handlers.HandleTestMap).Methods("GET")
 
-	// Catch-all for unsupported API versions
-	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Catch-all for API version routes only
+	router.PathPrefix("/v").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlers := api.NewHandlers(db, geocodeClient, geoipClient, cacheService)
 		handlers.HandleUnsupportedVersion(w, r)
 	})
