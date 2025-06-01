@@ -133,7 +133,7 @@ func (c *Client) GeocodeToStandardFormat(address string) (*models.GeocodeAPIResp
 		FormattedAddress:   result.FormattedAddress,
 		CountryName:        countryName,
 		CountryCode:        countryCode,
-		Backend:            "google_geocoding_api",
+		Backend:            "google_maps_platform_geocoding",
 		RawBackendResponse: googleResp,
 	}
 

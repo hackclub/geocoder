@@ -46,7 +46,7 @@ Returns standardized JSON with extracted coordinates and country information:
   "formatted_address": "1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA",
   "country_name": "United States",
   "country_code": "US",
-  "backend": "google_geocoding_api",
+  "backend": "google_maps_platform_geocoding",
   "raw_backend_response": {
     "results": [...],
     "status": "OK"
