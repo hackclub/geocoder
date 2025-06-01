@@ -17,7 +17,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o geocoder cmd/server/main.go
 # Final stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates tzdata wget bash make
+RUN apk --no-cache add ca-certificates tzdata curl bash make
 
 WORKDIR /root/
 
