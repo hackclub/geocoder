@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -175,22 +174,22 @@ func (h *Handlers) HandleGeoIP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check cache first
-	cached, cacheHit := h.cacheService.GetIPResult(ip)
-	var result *geoip.IPInfoResponse
+	cached, cacheHit := h.cacheService.GetStandardIPResult(ip)
+	var result *models.GeoIPAPIResponse
 	var err error
 
 	if cacheHit {
 		result = cached
 	} else {
 		// Make external API call
-		result, err = h.geoipClient.GetIPInfo(ip)
+		result, err = h.geoipClient.GetIPInfoToStandardFormat(ip)
 		if err != nil {
 			h.writeErrorResponse(w, http.StatusBadGateway, "EXTERNAL_API_ERROR", fmt.Sprintf("Failed to get IP info: %v", err))
 			return
 		}
 
 		// Cache the result
-		_ = h.cacheService.SetIPResult(ip, result)
+		_ = h.cacheService.SetStandardIPResult(ip, result)
 	}
 
 	responseTime := int(time.Since(startTime).Milliseconds())
@@ -204,7 +203,7 @@ func (h *Handlers) HandleGeoIP(w http.ResponseWriter, r *http.Request) {
 		apiSource = "ipinfo"
 	}
 	resultCount := 0
-	if result.City != "" || result.Region != "" || result.Country != "" {
+	if result.City != "" || result.Region != "" || result.CountryCode != "" {
 		resultCount = 1
 	}
 	_ = h.db.LogActivity(apiKey.Name, "v1/geoip", ip, resultCount, responseTime, apiSource, cacheHit, extractIP(r.RemoteAddr), r.UserAgent())
@@ -234,23 +233,16 @@ func (h *Handlers) HandleGeoIP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send WebSocket update if location is available
-	if result.Loc != "" {
-		parts := strings.Split(result.Loc, ",")
-		if len(parts) == 2 {
-			if lat, err := strconv.ParseFloat(parts[0], 64); err == nil {
-				if lng, err := strconv.ParseFloat(parts[1], 64); err == nil {
-					h.broadcastUpdate(models.WebSocketMessage{
-						Type:      "geoip_request",
-						Lat:       lat,
-						Lng:       lng,
-						CacheHit:  cacheHit,
-						Endpoint:  "v1/geoip",
-						IP:        ip,
-						Timestamp: time.Now(),
-					})
-				}
-			}
-		}
+	if result.Lat != 0 || result.Lng != 0 {
+		h.broadcastUpdate(models.WebSocketMessage{
+			Type:      "geoip_request",
+			Lat:       result.Lat,
+			Lng:       result.Lng,
+			CacheHit:  cacheHit,
+			Endpoint:  "v1/geoip",
+			IP:        ip,
+			Timestamp: time.Now(),
+		})
 	}
 
 	// Broadcast updated stats

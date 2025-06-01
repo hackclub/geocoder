@@ -115,6 +115,34 @@ func (c *CacheService) SetStandardGeocodeResult(address string, result *models.G
 	return c.db.SetAddressCache(queryHash, address, string(resultJSON), c.maxAddressCacheSize)
 }
 
+// GetStandardIPResult retrieves a cached standard IP geolocation response
+func (c *CacheService) GetStandardIPResult(ip string) (*models.GeoIPAPIResponse, bool) {
+	cached, err := c.db.GetIPCache(ip)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, false // Cache miss
+		}
+		return nil, false // Error, treat as cache miss
+	}
+
+	var result models.GeoIPAPIResponse
+	if err := json.Unmarshal([]byte(cached.ResponseData), &result); err != nil {
+		return nil, false // Invalid cached data, treat as cache miss
+	}
+
+	return &result, true // Cache hit
+}
+
+// SetStandardIPResult caches a standard IP geolocation response
+func (c *CacheService) SetStandardIPResult(ip string, result *models.GeoIPAPIResponse) error {
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("failed to marshal standard IP result: %w", err)
+	}
+
+	return c.db.SetIPCache(ip, string(resultJSON), c.maxIPCacheSize)
+}
+
 func (c *CacheService) hashQuery(query string) string {
 	// Normalize query: lowercase, trim, collapse spaces
 	normalized := strings.ToLower(strings.TrimSpace(query))

@@ -9,9 +9,10 @@ Geocoder provides a unified interface for geocoding operations while intelligent
 ## Features
 
 ### Core Functionality
-- **Address Geocoding**: Convert addresses to coordinates using Google Geocoding API
-- **Address Normalization**: Parse raw unstructured addresses into structured components (country, country code, state, city, postal code, etc.)
-- **IP Geolocation**: Convert IP addresses to location data using IPinfo API
+- **Address Geocoding**: Convert addresses to coordinates using Google Geocoding API with standardized response format
+- **Address Normalization**: Extract structured components (country name/code, formatted address) from raw addresses
+- **IP Geolocation**: Convert IP addresses to location data using IPinfo API with separated lat/lng coordinates
+- **Standardized Responses**: Consistent JSON format across both geocoding and IP geolocation with country name expansion
 - **Intelligent Caching**: Postgres-backed cache to reduce external API calls
 - **Cost Tracking**: Monitor API usage and associated costs
 - **API Key Management**: Issue and manage access keys for different services
@@ -36,7 +37,22 @@ GET /v1/geocode?address={address}&key={api_key}
 - `key` (required): Your API key for authentication
 
 **Response Format:**
-Returns Google Geocoding API-compatible JSON. See [Google's documentation](https://developers.google.com/maps/documentation/geocoding/requests-geocoding) for full response schema.
+Returns standardized JSON with extracted coordinates and country information:
+
+```json
+{
+  "lat": 37.4223,
+  "lng": -122.0844,
+  "formatted_address": "1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA",
+  "country_name": "United States",
+  "country_code": "US",
+  "backend": "google_geocoding_api",
+  "raw_backend_response": {
+    "results": [...],
+    "status": "OK"
+  }
+}
+```
 
 ### IP Geolocation
 ```
@@ -48,7 +64,33 @@ GET /v1/geoip?ip={ip_address}&key={api_key}
 - `key` (required): Your API key for authentication
 
 **Response Format:**
-Returns IPinfo free tier JSON with fields: `ip`, `city`, `region`, `country`, `loc`, `org`, `postal`, `timezone`.
+Returns standardized JSON with separated coordinates and expanded country information:
+
+```json
+{
+  "lat": 37.4056,
+  "lng": -122.0775,
+  "ip": "8.8.8.8",
+  "city": "Mountain View",
+  "region": "California",
+  "country_name": "United States",
+  "country_code": "US",
+  "postal_code": "94043",
+  "timezone": "America/Los_Angeles",
+  "org": "AS15169 Google LLC",
+  "backend": "ipinfo_api",
+  "raw_backend_response": {
+    "ip": "8.8.8.8",
+    "city": "Mountain View",
+    "region": "California",
+    "country": "US",
+    "loc": "37.4056,-122.0775",
+    "org": "AS15169 Google LLC",
+    "postal": "94043",
+    "timezone": "America/Los_Angeles"
+  }
+}
+```
 
 **Rate Limit Headers:**
 All API responses include: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`.
@@ -223,7 +265,7 @@ CREATE TABLE address_cache (
   id SERIAL PRIMARY KEY,
   query_hash VARCHAR(64) UNIQUE NOT NULL,     -- SHA-256 of normalized query
   query_text TEXT NOT NULL,                   -- Original query for debugging
-  response_data JSONB NOT NULL,               -- Compressed Google API response
+  response_data JSONB NOT NULL,               -- Standardized response with raw_backend_response
   created_at TIMESTAMP DEFAULT NOW(),
   INDEX(query_hash), INDEX(created_at)        -- FIFO ordering
 );
@@ -232,7 +274,7 @@ CREATE TABLE address_cache (
 CREATE TABLE ip_cache (
   id SERIAL PRIMARY KEY,
   ip_address INET UNIQUE NOT NULL,            -- Native IP type for efficiency
-  response_data JSONB NOT NULL,               -- IPinfo API response
+  response_data JSONB NOT NULL,               -- Standardized response with raw_backend_response
   created_at TIMESTAMP DEFAULT NOW(),
   INDEX(ip_address), INDEX(created_at)        -- FIFO ordering
 );
@@ -280,9 +322,10 @@ CREATE TABLE cost_tracking (
 ### Cache Strategy
 - **FIFO Eviction**: When cache hits size limit, delete oldest 10% of entries based on created_at timestamp
 - **Configurable Limits**: Separate maximum cache sizes for address (10k) and IP (5k) geocoding
+- **Standardized Format**: Caches the transformed standardized responses (not raw external API responses)
 - **Exact Query Matching**: Results cached by SHA-256 hash of normalized query string
 - **Cache Hit Logic**: Query hash exists in cache table
-- **Cache Miss Logic**: Query hash not found, requires external API call
+- **Cache Miss Logic**: Query hash not found, requires external API call and transformation
 - **Eviction Trigger**: Synchronous eviction on INSERT when count >= max_size
 
 ## Admin Dashboard

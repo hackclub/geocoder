@@ -107,13 +107,24 @@
 </head>
 <body>
     <h1>Hack Club Geocoder</h1>
-    <p class="subtitle">Turn addresses into coordinates and IPs into locations.</p>
+    <p class="subtitle">Turn addresses into coordinates and IPs into locations with standardized response formats.</p>
     
-    <p>A geocoding and IP geolocation API service with intelligent caching. Built for Hack Club projects that need location data.</p>
+    <p>A geocoding and IP geolocation API service with intelligent caching and consistent response formats. Built for Hack Club projects that need reliable location data.</p>
     
-    <p>Install with an API key from your administrator:</p>
+    <p>Quick start with an API key from your administrator:</p>
     
-    <pre><code>curl "https://geocoder.hackclub.com/v1/geocode?address=1600+Amphitheatre+Parkway&key=your_api_key"</code></pre>
+    <pre><code>curl "https://geocoder.hackclub.com/v1/geocode?address=1600+Amphitheatre+Parkway&key=your_api_key"
+
+# Returns:
+{
+  "lat": 37.4223,
+  "lng": -122.0844,
+  "formatted_address": "1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA",
+  "country_name": "United States",
+  "country_code": "US",
+  "backend": "google_geocoding_api",
+  "raw_backend_response": { ... }
+}</code></pre>
     
     <h2>API Endpoints</h2>
     
@@ -145,6 +156,21 @@
             <li><code>key</code> — Your API key</li>
         </ul>
         <pre><code>GET /v1/geoip?ip=8.8.8.8&key=your_api_key</code></pre>
+        <p><strong>Response format:</strong></p>
+        <pre><code>{
+  "lat": 37.4056,
+  "lng": -122.0775,
+  "ip": "8.8.8.8",
+  "city": "Mountain View",
+  "region": "California",
+  "country_name": "United States",
+  "country_code": "US",
+  "postal_code": "94043",
+  "timezone": "America/Los_Angeles",
+  "org": "AS15169 Google LLC",
+  "backend": "ipinfo_api",
+  "raw_backend_response": { ... }
+}</code></pre>
     </div>
     
     <div class="endpoint">
@@ -157,7 +183,9 @@
     <ul>
         <li>Intelligent caching for fast response times</li>
         <li>Rate limiting and API key authentication</li>
-        <li>Standardized response format with country information</li>
+        <li>Standardized response format with separated lat/lng coordinates</li>
+        <li>Expanded country information (both name and code)</li>
+        <li>Complete raw backend responses preserved for advanced use cases</li>
         <li>Real-time usage analytics and monitoring</li>
     </ul>
     

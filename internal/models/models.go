@@ -189,3 +189,19 @@ type GeocodeAPIResponse struct {
 	Backend              string      `json:"backend"`
 	RawBackendResponse   interface{} `json:"raw_backend_response"`
 }
+
+// GeoIPAPIResponse represents our standardized IP geolocation API response
+type GeoIPAPIResponse struct {
+	Lat                float64     `json:"lat"`
+	Lng                float64     `json:"lng"`
+	IP                 string      `json:"ip"`
+	City               string      `json:"city"`
+	Region             string      `json:"region"`
+	CountryName        string      `json:"country_name"`
+	CountryCode        string      `json:"country_code"`
+	PostalCode         string      `json:"postal_code"`
+	Timezone           string      `json:"timezone"`
+	Org                string      `json:"org"`
+	Backend            string      `json:"backend"`
+	RawBackendResponse interface{} `json:"raw_backend_response"`
+}
