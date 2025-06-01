@@ -73,7 +73,6 @@ type CreateAPIKeyRequest struct {
 	Owner              string `json:"owner"`
 	AppName            string `json:"app_name"`
 	Environment        string `json:"environment"`
-	Prefix             string `json:"prefix"`
 	RateLimitPerSecond int    `json:"rate_limit_per_second"`
 }
 
@@ -139,4 +138,43 @@ type Stats struct {
 	ActiveAPIKeys      int     `json:"active_api_keys"`
 	TodaysRequests     int64   `json:"todays_requests"`
 	TodaysCacheHits    int64   `json:"todays_cache_hits"`
+}
+
+// APIKeyUsageSummary represents usage analytics for an API key
+type APIKeyUsageSummary struct {
+	APIKey             APIKey                `json:"api_key"`
+	TotalRequests      int64                 `json:"total_requests"`
+	GeocodeRequests    int64                 `json:"geocode_requests"`
+	GeoipRequests      int64                 `json:"geoip_requests"`
+	CacheHits          int64                 `json:"cache_hits"`
+	CacheHitRate       float64               `json:"cache_hit_rate"`
+	EstimatedCostUSD   float64               `json:"estimated_cost_usd"`
+	DailyUsage         []DailyUsageStats     `json:"daily_usage"`
+	LastUsedAt         *time.Time            `json:"last_used_at"`
+}
+
+// DailyUsageStats represents daily usage for an API key
+type DailyUsageStats struct {
+	Date              time.Time `json:"date" db:"date"`
+	GeocodeRequests   int       `json:"geocode_requests" db:"geocode_requests"`
+	GeocodeCacheHits  int       `json:"geocode_cache_hits" db:"geocode_cache_hits"`
+	GeoipRequests     int       `json:"geoip_requests" db:"geoip_requests"`
+	GeoipCacheHits    int       `json:"geoip_cache_hits" db:"geoip_cache_hits"`
+	TotalRequests     int       `json:"total_requests" db:"total_requests"`
+	EstimatedCostUSD  float64   `json:"estimated_cost_usd" db:"estimated_cost_usd"`
+}
+
+// UsageSummaryRequest represents pagination request for usage summary
+type UsageSummaryRequest struct {
+	Page     int `json:"page"`
+	PageSize int `json:"page_size"`
+}
+
+// UsageSummaryResponse represents paginated usage summary response
+type UsageSummaryResponse struct {
+	APIKeys    []APIKeyUsageSummary `json:"api_keys"`
+	TotalCount int                  `json:"total_count"`
+	Page       int                  `json:"page"`
+	PageSize   int                  `json:"page_size"`
+	TotalPages int                  `json:"total_pages"`
 }

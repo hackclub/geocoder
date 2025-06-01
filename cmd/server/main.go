@@ -76,6 +76,7 @@ func main() {
 	admin.HandleFunc("/keys/{key_id}", handlers.HandleDeactivateAPIKey).Methods("DELETE")
 	admin.HandleFunc("/stats", handlers.HandleAdminStats).Methods("GET")
 	admin.HandleFunc("/activity", handlers.HandleAdminActivity).Methods("GET")
+	admin.HandleFunc("/usage-summary", handlers.HandleUsageSummary).Methods("GET")
 	admin.HandleFunc("/ws", handlers.HandleWebSocket)
 
 	// Redirect /admin to /admin/dashboard

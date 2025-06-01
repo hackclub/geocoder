@@ -99,18 +99,7 @@
             width: 100%;
         }
         
-        .api-keys-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        
-        .api-key-item {
-            padding: 1rem;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+
         
         .api-key-item:last-child {
             border-bottom: none;
@@ -365,6 +354,87 @@
             flex-shrink: 0;
         }
         
+        .usage-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        .usage-summary-table th,
+        .usage-summary-table td {
+            padding: 0.5rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+            font-size: 0.875rem;
+        }
+        
+        .usage-summary-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .usage-summary-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .cost-high {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+        
+        .cost-medium {
+            color: #f39c12;
+            font-weight: 600;
+        }
+        
+        .cost-low {
+            color: #27ae60;
+        }
+        
+        .mini-chart {
+            width: 100px;
+            height: 30px;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 1.5rem;
+            gap: 0.5rem;
+            padding: 1rem;
+            border-top: 1px solid #eee;
+        }
+        
+        .pagination button {
+            padding: 0.5rem 1rem;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        .pagination button:hover:not(:disabled) {
+            background: #f0f0f0;
+        }
+        
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pagination button.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        
+        .pagination-info {
+            color: #666;
+            font-size: 0.875rem;
+        }
+
         @media (max-width: 768px) {
             .main-content {
                 grid-template-columns: 1fr;
@@ -376,6 +446,15 @@
             
             .container {
                 padding: 1rem;
+            }
+            
+            .usage-summary-table {
+                font-size: 0.875rem;
+            }
+            
+            .mini-chart {
+                width: 60px;
+                height: 20px;
             }
         }
     </style>
@@ -428,13 +507,8 @@
             </div>
             
             <div class="section">
-                <div class="section-header">API Keys</div>
+                <div class="section-header">Create New API Key</div>
                 <div class="section-content">
-                    <div id="api-keys-list" class="api-keys-list">
-                        <!-- API keys will be loaded here -->
-                    </div>
-                    <hr style="margin: 1rem 0;">
-                    <h4>Create New API Key</h4>
                     
                     <!-- New API Key Display -->
                     <div id="new-api-key-display" class="new-key-display" style="display: none;">
@@ -485,17 +559,9 @@
                         </div>
                         <div class="form-group">
                             <label for="key-environment">Environment</label>
-                            <select id="key-environment" required>
-                                <option value="">Select environment</option>
-                                <option value="dev">dev (local laptop)</option>
-                                <option value="staging">staging</option>
-                                <option value="prod">prod (deployed app)</option>
-                            </select>
+                            <input type="text" id="key-environment" required placeholder="e.g., dev, prod">
                         </div>
-                        <div class="form-group">
-                            <label for="key-prefix">Prefix</label>
-                            <input type="text" id="key-prefix" value="hc" required maxlength="10">
-                        </div>
+
                         <div class="form-group">
                             <label for="rate-limit">Rate Limit (per second)</label>
                             <input type="number" id="rate-limit" value="10" min="1" max="1000">
@@ -504,19 +570,32 @@
                     </form>
                 </div>
             </div>
-            
-            <div class="section">
-                <div class="section-header">Recent Activity</div>
-                <div class="section-content">
-                    <div id="activity-log" class="activity-log">
-                        <!-- Activity log will be loaded here -->
-                    </div>
+        </div>
+        
+        <div class="section" style="margin-bottom: 2rem;">
+            <div class="section-header">API Key Usage Summary</div>
+            <div class="section-content">
+                <div id="usage-summary">
+                    <!-- Usage summary will be loaded here -->
+                </div>
+                <div id="usage-pagination" class="pagination" style="display: none;">
+                    <!-- Pagination controls will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="section" style="margin-bottom: 2rem;">
+            <div class="section-header">Recent Activity</div>
+            <div class="section-content">
+                <div id="activity-log" class="activity-log">
+                    <!-- Activity log will be loaded here -->
                 </div>
             </div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // Initialize map
         const map = L.map('map').setView([39.8283, -98.5795], 4); // Center on USA
@@ -646,41 +725,7 @@
             document.getElementById('todays-requests').textContent = stats.todays_requests.toLocaleString();
         }
         
-        // Load API keys
-        function loadAPIKeys() {
-            fetch('/admin/keys')
-                .then(response => response.json())
-                .then(keys => {
-                    const container = document.getElementById('api-keys-list');
-                    container.innerHTML = '';
-                    
-                    keys.forEach(key => {
-                        const item = document.createElement('div');
-                        item.className = 'api-key-item';
-                        
-                        const statusClass = key.is_active ? 'status-active' : 'status-inactive';
-                        const statusText = key.is_active ? 'Active' : 'Inactive';
-                        
-                        item.innerHTML = `
-                            <div class="api-key-info">
-                                <h4>${key.name}</h4>
-                                <div class="meta">
-                                    <span class="${statusClass}">${statusText}</span> • 
-                                    ${key.rate_limit_per_second}/sec • 
-                                    ${key.request_count} requests
-                                    ${key.owner ? `<br><strong>Owner:</strong> ${key.owner} • <strong>App:</strong> ${key.app_name} • <strong>Env:</strong> ${key.environment}` : ''}
-                                </div>
-                            </div>
-                            <div>
-                                ${key.is_active ? `<button class="btn btn-danger" onclick="deactivateKey('${key.id}')">Deactivate</button>` : ''}
-                            </div>
-                        `;
-                        
-                        container.appendChild(item);
-                    });
-                })
-                .catch(error => console.error('Error loading API keys:', error));
-        }
+
         
         // Create API key
         document.getElementById('create-key-form').addEventListener('submit', function(e) {
@@ -699,7 +744,6 @@
                 owner: owner,
                 app_name: appName,
                 environment: environment,
-                prefix: document.getElementById('key-prefix').value,
                 rate_limit_per_second: parseInt(document.getElementById('rate-limit').value)
             };
             
@@ -715,7 +759,7 @@
                 // Show the new API key in the custom display
                 showNewAPIKey(result);
                 document.getElementById('create-key-form').reset();
-                loadAPIKeys();
+                loadUsageSummary(currentUsagePage);
             })
             .catch(error => {
                 console.error('Error creating API key:', error);
@@ -782,7 +826,7 @@
                     method: 'DELETE'
                 })
                 .then(() => {
-                    loadAPIKeys();
+                    loadUsageSummary(currentUsagePage);
                 })
                 .catch(error => {
                     console.error('Error deactivating API key:', error);
@@ -863,16 +907,191 @@
             setTimeout(() => item.classList.remove('new-activity'), 2000);
         }
 
+        // Usage Summary functionality
+        let currentUsagePage = 1;
+        const usagePageSize = 5;
+        
+        function loadUsageSummary(page = 1) {
+            currentUsagePage = page;
+            fetch(`/admin/usage-summary?page=${page}&page_size=${usagePageSize}`)
+                .then(response => response.json())
+                .then(data => {
+                    displayUsageSummary(data);
+                    updateUsagePagination(data);
+                })
+                .catch(error => {
+                    console.error('Error loading usage summary:', error);
+                    document.getElementById('usage-summary').innerHTML = 
+                        '<div style="padding: 1rem; text-align: center; color: #e74c3c;">Failed to load usage summary</div>';
+                });
+        }
+        
+        function displayUsageSummary(data) {
+            const container = document.getElementById('usage-summary');
+            
+            if (!data.api_keys || data.api_keys.length === 0) {
+                container.innerHTML = '<div style="padding: 1rem; text-align: center; color: #7f8c8d;">No API keys found</div>';
+                return;
+            }
+            
+            let html = `
+                <table class="usage-summary-table">
+                    <thead>
+                        <tr>
+                            <th>API Key</th>
+                            <th>Owner</th>
+                            <th>Total Requests</th>
+                            <th>Cache Hit Rate</th>
+                            <th>Est. Cost (USD)</th>
+                            <th>Last Used</th>
+                            <th>Daily Usage (7d)</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            data.api_keys.forEach((keyData, index) => {
+                const costClass = keyData.estimated_cost_usd > 1 ? 'cost-high' : 
+                                  keyData.estimated_cost_usd > 0.1 ? 'cost-medium' : 'cost-low';
+                
+                // Format last used date
+                const lastUsed = keyData.last_used_at ? 
+                    new Date(keyData.last_used_at).toLocaleDateString() + ' ' + 
+                    new Date(keyData.last_used_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 
+                    'Never';
+                
+                html += `
+                    <tr>
+                        <td>
+                            <strong>${keyData.api_key.name}</strong><br>
+                            <small style="color: #666;">${keyData.api_key.app_name} (${keyData.api_key.environment})</small>
+                        </td>
+                        <td>${keyData.api_key.owner}</td>
+                        <td>${keyData.total_requests.toLocaleString()}</td>
+                        <td>${keyData.cache_hit_rate.toFixed(1)}%</td>
+                        <td class="${costClass}">$${keyData.estimated_cost_usd.toFixed(3)}</td>
+                        <td><small>${lastUsed}</small></td>
+                        <td>
+                            <canvas id="chart-${index}" class="mini-chart"></canvas>
+                        </td>
+                        <td>
+                            ${keyData.api_key.is_active ? `<button class="btn btn-danger" onclick="deactivateKey('${keyData.api_key.id}')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">Deactivate</button>` : '<span style="color: #999;">Inactive</span>'}
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+            
+            // Create mini charts
+            data.api_keys.forEach((keyData, index) => {
+                createMiniChart(`chart-${index}`, keyData.daily_usage);
+            });
+        }
+        
+        function createMiniChart(canvasId, dailyUsage) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            
+            // Handle null or empty daily usage
+            if (!dailyUsage || dailyUsage.length === 0) {
+                ctx.width = 100;
+                ctx.height = 30;
+                const context = ctx.getContext('2d');
+                context.fillStyle = '#f0f0f0';
+                context.fillRect(0, 0, 100, 30);
+                context.fillStyle = '#999';
+                context.font = '10px sans-serif';
+                context.textAlign = 'center';
+                context.fillText('No data', 50, 20);
+                return;
+            }
+            
+            // Prepare data for last 7 days
+            const last7Days = dailyUsage.slice(0, 7).reverse();
+            const labels = last7Days.map(d => new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }));
+            const requests = last7Days.map(d => d.total_requests);
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: requests,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: () => '',
+                                label: (context) => `${context.parsed.y} requests`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    },
+                    elements: {
+                        point: { radius: 0 }
+                    }
+                }
+            });
+        }
+        
+        function updateUsagePagination(data) {
+            const container = document.getElementById('usage-pagination');
+            
+            if (data.total_pages <= 1) {
+                // Still show pagination info even with one page
+                container.style.display = 'flex';
+                container.innerHTML = `<span class="pagination-info">Showing ${data.total_count} API key${data.total_count !== 1 ? 's' : ''}</span>`;
+                return;
+            }
+            
+            container.style.display = 'flex';
+            
+            let html = `
+                <button ${data.page <= 1 ? 'disabled' : ''} onclick="loadUsageSummary(${data.page - 1})">Previous</button>
+            `;
+            
+            // Show page numbers
+            const startPage = Math.max(1, data.page - 2);
+            const endPage = Math.min(data.total_pages, data.page + 2);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="${i === data.page ? 'active' : ''}" onclick="loadUsageSummary(${i})">${i}</button>`;
+            }
+            
+            html += `
+                <button ${data.page >= data.total_pages ? 'disabled' : ''} onclick="loadUsageSummary(${data.page + 1})">Next</button>
+                <span class="pagination-info">Page ${data.page} of ${data.total_pages} (${data.total_count} total)</span>
+            `;
+            
+            container.innerHTML = html;
+        }
+
         // Load initial data
         loadStats();
-        loadAPIKeys();
         loadActivityLog();
+        loadUsageSummary();
         
         // Refresh stats every 5 minutes (since we have real-time updates via WebSocket)
         setInterval(loadStats, 300000);
         
-        // Refresh API keys every 2 minutes
-        setInterval(loadAPIKeys, 120000);
+        // Refresh usage summary every 3 minutes
+        setInterval(() => loadUsageSummary(currentUsagePage), 180000);
     </script>
 </body>
 </html>

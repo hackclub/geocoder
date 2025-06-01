@@ -12,9 +12,9 @@ func TestHashAPIKey(t *testing.T) {
 		name string
 		key  string
 	}{
-		{"Standard key", "test_live_sk_abc123"},
+		{"Standard key", "test_abc123"},
 		{"Empty key", ""},
-		{"Unicode key", "test_live_sk_🔑"},
+		{"Unicode key", "test_🔑"},
 	}
 
 	for _, tt := range tests {
@@ -36,8 +36,8 @@ func TestHashAPIKey(t *testing.T) {
 }
 
 func TestHashAPIKey_Different(t *testing.T) {
-	key1 := "test_live_sk_abc123"
-	key2 := "test_live_sk_def456"
+	key1 := "test_abc123"
+	key2 := "test_def456"
 	
 	hash1 := HashAPIKey(key1)
 	hash2 := HashAPIKey(key2)
@@ -190,7 +190,7 @@ func TestMockDatabase_APIKeyOperations(t *testing.T) {
 	db := newMockDatabase()
 	
 	// Test creating API key
-	keyHash := HashAPIKey("test_live_sk_abc123")
+	keyHash := HashAPIKey("test_abc123")
 	apiKey, err := db.CreateAPIKey(keyHash, "test-key", "test-owner", "test-app", "dev", 10)
 	if err != nil {
 		t.Fatalf("Failed to create API key: %v", err)

@@ -205,7 +205,6 @@ func TestHandleAdminKeys_POST(t *testing.T) {
 		Owner:              "test-owner",
 		AppName:            "test-app",
 		Environment:        "dev",
-		Prefix:             "test",
 		RateLimitPerSecond: 15,
 	}
 	
@@ -229,8 +228,8 @@ func TestHandleAdminKeys_POST(t *testing.T) {
 		t.Errorf("Expected name 'test-key', got '%s'", response.Name)
 	}
 
-	if !strings.HasPrefix(response.Key, "test_live_sk_") {
-		t.Errorf("Expected key to start with 'test_live_sk_', got '%s'", response.Key)
+	if !strings.HasPrefix(response.Key, "test-owner_dev_test-app_") {
+		t.Errorf("Expected key to start with 'test-owner_dev_test-app_', got '%s'", response.Key)
 	}
 }
 

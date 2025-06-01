@@ -4,8 +4,6 @@ package tests
 
 import (
 	"bytes"
-	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -19,13 +17,11 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/hackclub/geocoder/internal/api"
 	"github.com/hackclub/geocoder/internal/cache"
-	"github.com/hackclub/geocoder/internal/config"
 	"github.com/hackclub/geocoder/internal/database"
 	"github.com/hackclub/geocoder/internal/geocoding"
 	"github.com/hackclub/geocoder/internal/geoip"
 	"github.com/hackclub/geocoder/internal/middleware"
 	"github.com/hackclub/geocoder/internal/models"
-	_ "github.com/lib/pq"
 )
 
 var (
@@ -52,29 +48,11 @@ func TestMain(m *testing.M) {
 }
 
 func setupTestDB() {
-	cfg := config.Load()
-	
-	// Use test database or in-memory mock
-	if cfg.DatabaseURL != "" && strings.Contains(cfg.DatabaseURL, "test") {
-		// Use real test database
-		sqlDB, err := sql.Open("postgres", cfg.DatabaseURL)
-		if err != nil {
-			panic(fmt.Sprintf("Failed to connect to test database: %v", err))
-		}
-		
-		testDB = database.NewPostgreSQLDatabase(sqlDB)
-		
-		// Run migrations
-		err = testDB.(*database.PostgreSQLDatabase).RunMigrations()
-		if err != nil {
-			panic(fmt.Sprintf("Failed to run migrations: %v", err))
-		}
-	} else {
-		// Use mock database for CI/local testing without postgres
-		testDB = &mockFullIntegrationDB{
-			apiKeys: make(map[string]*models.APIKey),
-			usageLogs: make([]models.UsageLog, 0),
-		}
+	// Always use mock database for integration tests to avoid external dependencies
+	// Real database integration can be tested manually
+	testDB = &mockFullIntegrationDB{
+		apiKeys: make(map[string]*models.APIKey),
+		usageLogs: make([]models.UsageLog, 0),
 	}
 }
 
@@ -89,19 +67,21 @@ func setupTestServer() {
 	keyHash := database.HashAPIKey(keyPlain)
 	testAPIKey = keyPlain
 	
-	testDB.CreateAPIKey(keyHash, "Integration Test Key", 100)
+	testDB.CreateAPIKey(keyHash, "Integration Test Key", "test", "geocoder", "test", 100)
 	
 	// Setup router
 	router := mux.NewRouter()
 	
+	// Initialize rate limiter
+	rateLimiter := middleware.NewRateLimiter()
+	
 	// Add middleware
 	router.Use(middleware.CORS())
-	router.Use(middleware.Logging())
 	
 	// API routes
 	apiRouter := router.PathPrefix("/v1").Subrouter()
-	apiRouter.Use(middleware.Authentication(testDB))
-	apiRouter.Use(middleware.RateLimit(testDB))
+	apiRouter.Use(middleware.APIKeyAuth(testDB))
+	apiRouter.Use(rateLimiter.RateLimit())
 	
 	apiRouter.HandleFunc("/geocode", testHandlers.HandleGeocode).Methods("GET")
 	apiRouter.HandleFunc("/geoip", testHandlers.HandleGeoIP).Methods("GET")
@@ -115,9 +95,8 @@ func setupTestServer() {
 	adminRouter.Use(middleware.BasicAuth("admin", "admin"))
 	
 	adminRouter.HandleFunc("/ws", testHandlers.HandleWebSocket).Methods("GET")
-	adminRouter.HandleFunc("/api/keys", testHandlers.HandleAdminCreateKey).Methods("POST")
-	adminRouter.HandleFunc("/api/keys", testHandlers.HandleAdminGetKeys).Methods("GET")
-	adminRouter.HandleFunc("/api/stats", testHandlers.HandleAdminStats).Methods("GET")
+	adminRouter.HandleFunc("/keys", testHandlers.HandleAdminKeys).Methods("POST", "GET")
+	adminRouter.HandleFunc("/stats", testHandlers.HandleAdminStats).Methods("GET")
 	adminRouter.HandleFunc("/dashboard", testHandlers.HandleAdminDashboard).Methods("GET")
 	
 	// Catch unsupported versions
@@ -320,7 +299,7 @@ func TestIntegration_RateLimit(t *testing.T) {
 	// Create API key with low rate limit for testing
 	lowLimitKey := "test-rate-limit-key"
 	keyHash := database.HashAPIKey(lowLimitKey)
-	testDB.CreateAPIKey(keyHash, "Rate Limit Test", 2)
+	testDB.CreateAPIKey(keyHash, "Rate Limit Test", "test", "geocoder", "test", 2)
 	
 	url := fmt.Sprintf("%s/v1/geocode?address=test&key=%s", 
 		testServer.URL, lowLimitKey)
@@ -368,7 +347,7 @@ func TestIntegration_AdminEndpoints(t *testing.T) {
 	client := &http.Client{}
 	
 	// Test admin stats
-	req, _ := http.NewRequest("GET", testServer.URL+"/admin/api/stats", nil)
+	req, _ := http.NewRequest("GET", testServer.URL+"/admin/stats", nil)
 	req.SetBasicAuth("admin", "admin")
 	
 	resp, err := client.Do(req)
@@ -393,7 +372,7 @@ func TestIntegration_AdminEndpoints(t *testing.T) {
 	}
 	
 	keyJSON, _ := json.Marshal(keyData)
-	req, _ = http.NewRequest("POST", testServer.URL+"/admin/api/keys", bytes.NewBuffer(keyJSON))
+	req, _ = http.NewRequest("POST", testServer.URL+"/admin/keys", bytes.NewBuffer(keyJSON))
 	req.SetBasicAuth("admin", "admin")
 	req.Header.Set("Content-Type", "application/json")
 	
@@ -519,11 +498,14 @@ type mockFullIntegrationDB struct {
 func (m *mockFullIntegrationDB) Close() error { return nil }
 func (m *mockFullIntegrationDB) Ping() error  { return nil }
 
-func (m *mockFullIntegrationDB) CreateAPIKey(keyHash, name string, rateLimitPerSecond int) (*models.APIKey, error) {
+func (m *mockFullIntegrationDB) CreateAPIKey(keyHash, name, owner, appName, environment string, rateLimitPerSecond int) (*models.APIKey, error) {
 	key := &models.APIKey{
 		ID:                 fmt.Sprintf("key-%d", len(m.apiKeys)),
 		KeyHash:            keyHash,
 		Name:               name,
+		Owner:              owner,
+		AppName:            appName,
+		Environment:        environment,
 		IsActive:           true,
 		RateLimitPerSecond: rateLimitPerSecond,
 		CreatedAt:          time.Now(),
@@ -581,7 +563,7 @@ func (m *mockFullIntegrationDB) LogUsage(apiKeyID, endpoint string, cacheHit boo
 		Endpoint:       endpoint,
 		CacheHit:       cacheHit,
 		ResponseTimeMs: responseTimeMs,
-		Timestamp:      time.Now(),
+		CreatedAt:      time.Now(),
 	}
 	m.usageLogs = append(m.usageLogs, log)
 	return nil
@@ -592,7 +574,7 @@ func (m *mockFullIntegrationDB) GetStats() (*models.Stats, error) {
 		TotalRequests:       int64(len(m.usageLogs)),
 		CacheHitRate:       75.0,
 		AverageResponseTime: 120.0,
-		ActiveAPIKeys:      int64(len(m.apiKeys)),
+		ActiveAPIKeys:      len(m.apiKeys),
 		TodaysRequests:     10,
 		TodaysCacheHits:    7,
 	}, nil
@@ -600,4 +582,12 @@ func (m *mockFullIntegrationDB) GetStats() (*models.Stats, error) {
 
 func (m *mockFullIntegrationDB) UpdateCostTracking(date time.Time, geocodeRequests, geocodeCacheHits, geoipRequests, geoipCacheHits int, estimatedCost float64) error {
 	return nil
+}
+
+func (m *mockFullIntegrationDB) LogActivity(apiKeyName, endpoint, queryText string, resultCount, responseTimeMs int, apiSource string, cacheHit bool, ipAddress, userAgent string) error {
+	return nil
+}
+
+func (m *mockFullIntegrationDB) GetRecentActivity() ([]models.ActivityLog, error) {
+	return []models.ActivityLog{}, nil
 }

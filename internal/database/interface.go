@@ -33,6 +33,9 @@ type DatabaseInterface interface {
 	// Activity logging
 	LogActivity(apiKeyName, endpoint, queryText string, resultCount, responseTimeMs int, apiSource string, cacheHit bool, ipAddress, userAgent string) error
 	GetRecentActivity() ([]models.ActivityLog, error)
+	
+	// Usage summary
+	GetAPIKeyUsageSummary(page, pageSize int) (*models.UsageSummaryResponse, error)
 }
 
 // Ensure DB implements DatabaseInterface

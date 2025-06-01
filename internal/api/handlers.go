@@ -1,6 +1,8 @@
 package api
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -101,7 +103,7 @@ func (h *Handlers) HandleGeocode(w http.ResponseWriter, r *http.Request) {
 	if !cacheHit {
 		apiSource = "google"
 	}
-	_ = h.db.LogActivity(apiKey.Name, "v1/geocode", address, len(result.Results), responseTime, apiSource, cacheHit, r.RemoteAddr, r.UserAgent())
+	_ = h.db.LogActivity(apiKey.Name, "v1/geocode", address, len(result.Results), responseTime, apiSource, cacheHit, extractIP(r.RemoteAddr), r.UserAgent())
 	
 	// Broadcast activity update
 	activity := &models.ActivityLog{
@@ -113,7 +115,7 @@ func (h *Handlers) HandleGeocode(w http.ResponseWriter, r *http.Request) {
 		ResponseTimeMs: responseTime,
 		APISource:      apiSource,
 		CacheHit:       cacheHit,
-		IPAddress:      r.RemoteAddr,
+		IPAddress:      extractIP(r.RemoteAddr),
 		UserAgent:      r.UserAgent(),
 	}
 	h.broadcastActivity(activity)
@@ -202,7 +204,7 @@ func (h *Handlers) HandleGeoIP(w http.ResponseWriter, r *http.Request) {
 	if result.City != "" || result.Region != "" || result.Country != "" {
 		resultCount = 1
 	}
-	_ = h.db.LogActivity(apiKey.Name, "v1/geoip", ip, resultCount, responseTime, apiSource, cacheHit, r.RemoteAddr, r.UserAgent())
+	_ = h.db.LogActivity(apiKey.Name, "v1/geoip", ip, resultCount, responseTime, apiSource, cacheHit, extractIP(r.RemoteAddr), r.UserAgent())
 	
 	// Broadcast activity update
 	activity := &models.ActivityLog{
@@ -214,7 +216,7 @@ func (h *Handlers) HandleGeoIP(w http.ResponseWriter, r *http.Request) {
 		ResponseTimeMs: responseTime,
 		APISource:      apiSource,
 		CacheHit:       cacheHit,
-		IPAddress:      r.RemoteAddr,
+		IPAddress:      extractIP(r.RemoteAddr),
 		UserAgent:      r.UserAgent(),
 	}
 	h.broadcastActivity(activity)
@@ -340,8 +342,8 @@ func (h *Handlers) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name == "" || req.Prefix == "" || req.Owner == "" || req.AppName == "" || req.Environment == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Name, owner, app_name, environment, and prefix are required")
+	if req.Name == "" || req.Owner == "" || req.AppName == "" || req.Environment == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Name, owner, app_name, and environment are required")
 		return
 	}
 
@@ -349,8 +351,11 @@ func (h *Handlers) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 		req.RateLimitPerSecond = 10
 	}
 
+	// Auto-generate prefix from user input
+	prefix := fmt.Sprintf("%s_%s_%s", req.Owner, req.AppName, req.Environment)
+	
 	// Generate API key
-	apiKey := h.generateAPIKey(req.Prefix)
+	apiKey := h.generateAPIKey(prefix)
 	keyHash := database.HashAPIKey(apiKey)
 
 	// Save to database
@@ -441,6 +446,33 @@ func (h *Handlers) HandleAdminActivity(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(activities)
 }
 
+func (h *Handlers) HandleUsageSummary(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters for pagination
+	page := 1
+	pageSize := 10
+	
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+	
+	if pageSizeStr := r.URL.Query().Get("page_size"); pageSizeStr != "" {
+		if ps, err := strconv.Atoi(pageSizeStr); err == nil && ps > 0 && ps <= 100 {
+			pageSize = ps
+		}
+	}
+
+	summary, err := h.db.GetAPIKeyUsageSummary(page, pageSize)
+	if err != nil {
+		h.writeErrorResponse(w, http.StatusInternalServerError, "DATABASE_ERROR", "Failed to retrieve usage summary")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(summary)
+}
+
 // WebSocket handling
 func (h *Handlers) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := h.upgrader.Upgrade(w, r, nil)
@@ -516,8 +548,16 @@ func (h *Handlers) handleWebSocketBroadcast() {
 }
 
 func (h *Handlers) generateAPIKey(prefix string) string {
-	// Simple random string generation (in production, use crypto/rand)
-	return fmt.Sprintf("%s_live_sk_%d", prefix, time.Now().UnixNano()%1000000000)
+	// Generate 20 random bytes for secure key
+	randomBytes := make([]byte, 20)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		// Fallback to timestamp if crypto/rand fails
+		return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano()%1000000000)
+	}
+	
+	randomString := hex.EncodeToString(randomBytes)
+	return fmt.Sprintf("%s_%s", prefix, randomString)
 }
 
 func (h *Handlers) HandleUnsupportedVersion(w http.ResponseWriter, r *http.Request) {
@@ -537,4 +577,12 @@ func (h *Handlers) writeErrorResponse(w http.ResponseWriter, statusCode int, err
 	}
 
 	json.NewEncoder(w).Encode(errorResp)
+}
+
+// extractIP extracts the IP address from a RemoteAddr string (removes port if present)
+func extractIP(remoteAddr string) string {
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		return host
+	}
+	return remoteAddr // fallback if not in host:port format
 }

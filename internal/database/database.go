@@ -354,6 +354,144 @@ func (db *DB) GetRecentActivity() ([]models.ActivityLog, error) {
 	return activities, rows.Err()
 }
 
+// GetAPIKeyUsageSummary returns usage analytics for all API keys with pagination
+func (db *DB) GetAPIKeyUsageSummary(page, pageSize int) (*models.UsageSummaryResponse, error) {
+	offset := (page - 1) * pageSize
+	
+	// Get total count first
+	var totalCount int
+	countQuery := "SELECT COUNT(*) FROM api_keys WHERE is_active = true"
+	err := db.conn.QueryRow(countQuery).Scan(&totalCount)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Main query to get API keys with usage stats
+	query := `
+		SELECT 
+			ak.id, ak.key_hash, ak.name, ak.owner, ak.app_name, ak.environment, 
+			ak.is_active, ak.rate_limit_per_second, ak.created_at, ak.last_used_at, ak.request_count,
+			COALESCE(SUM(CASE WHEN ul.endpoint = 'v1/geocode' THEN 1 ELSE 0 END), 0) as geocode_requests,
+			COALESCE(SUM(CASE WHEN ul.endpoint = 'v1/geoip' THEN 1 ELSE 0 END), 0) as geoip_requests,
+			COALESCE(SUM(CASE WHEN ul.cache_hit = true THEN 1 ELSE 0 END), 0) as cache_hits,
+			COALESCE(COUNT(ul.id), 0) as total_requests,
+			COALESCE(SUM(CASE 
+				WHEN ul.endpoint = 'v1/geocode' AND ul.cache_hit = false THEN 0.005 
+				ELSE 0 
+			END), 0) as estimated_cost_usd
+		FROM api_keys ak
+		LEFT JOIN usage_logs ul ON ak.id = ul.api_key_id
+		WHERE ak.is_active = true
+		GROUP BY ak.id, ak.key_hash, ak.name, ak.owner, ak.app_name, ak.environment, 
+				 ak.is_active, ak.rate_limit_per_second, ak.created_at, ak.last_used_at, ak.request_count
+		ORDER BY ak.last_used_at DESC NULLS LAST, total_requests DESC
+		LIMIT $1 OFFSET $2
+	`
+	
+	rows, err := db.conn.Query(query, pageSize, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var summaries []models.APIKeyUsageSummary
+	for rows.Next() {
+		var summary models.APIKeyUsageSummary
+		var totalRequests, geocodeRequests, geoipRequests, cacheHits int64
+		var estimatedCost float64
+		
+		err := rows.Scan(
+			&summary.APIKey.ID, &summary.APIKey.KeyHash, &summary.APIKey.Name, 
+			&summary.APIKey.Owner, &summary.APIKey.AppName, &summary.APIKey.Environment,
+			&summary.APIKey.IsActive, &summary.APIKey.RateLimitPerSecond, 
+			&summary.APIKey.CreatedAt, &summary.APIKey.LastUsedAt, &summary.APIKey.RequestCount,
+			&geocodeRequests, &geoipRequests, &cacheHits, &totalRequests, &estimatedCost,
+		)
+		if err != nil {
+			return nil, err
+		}
+		
+		summary.TotalRequests = totalRequests
+		summary.GeocodeRequests = geocodeRequests
+		summary.GeoipRequests = geoipRequests
+		summary.CacheHits = cacheHits
+		summary.EstimatedCostUSD = estimatedCost
+		summary.LastUsedAt = summary.APIKey.LastUsedAt
+		
+		// Calculate cache hit rate
+		if totalRequests > 0 {
+			summary.CacheHitRate = float64(cacheHits) / float64(totalRequests) * 100
+		}
+		
+		// Get daily usage for last 30 days
+		dailyUsage, err := db.getAPIKeyDailyUsage(summary.APIKey.ID)
+		if err != nil {
+			return nil, err
+		}
+		summary.DailyUsage = dailyUsage
+		
+		summaries = append(summaries, summary)
+	}
+	
+	totalPages := (totalCount + pageSize - 1) / pageSize
+	
+	return &models.UsageSummaryResponse{
+		APIKeys:    summaries,
+		TotalCount: totalCount,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
+	}, nil
+}
+
+// getAPIKeyDailyUsage gets daily usage stats for an API key over the last 30 days
+func (db *DB) getAPIKeyDailyUsage(apiKeyID string) ([]models.DailyUsageStats, error) {
+	query := `
+		SELECT 
+			DATE(ul.created_at) as date,
+			SUM(CASE WHEN ul.endpoint = 'v1/geocode' THEN 1 ELSE 0 END) as geocode_requests,
+			SUM(CASE WHEN ul.endpoint = 'v1/geocode' AND ul.cache_hit = true THEN 1 ELSE 0 END) as geocode_cache_hits,
+			SUM(CASE WHEN ul.endpoint = 'v1/geoip' THEN 1 ELSE 0 END) as geoip_requests,
+			SUM(CASE WHEN ul.endpoint = 'v1/geoip' AND ul.cache_hit = true THEN 1 ELSE 0 END) as geoip_cache_hits,
+			COUNT(*) as total_requests,
+			SUM(CASE 
+				WHEN ul.endpoint = 'v1/geocode' AND ul.cache_hit = false THEN 0.005 
+				ELSE 0 
+			END) as estimated_cost_usd
+		FROM usage_logs ul
+		WHERE ul.api_key_id = $1 
+		  AND ul.created_at >= NOW() - INTERVAL '30 days'
+		GROUP BY DATE(ul.created_at)
+		ORDER BY date DESC
+	`
+	
+	rows, err := db.conn.Query(query, apiKeyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var dailyStats []models.DailyUsageStats
+	for rows.Next() {
+		var stats models.DailyUsageStats
+		err := rows.Scan(
+			&stats.Date,
+			&stats.GeocodeRequests,
+			&stats.GeocodeCacheHits,
+			&stats.GeoipRequests,
+			&stats.GeoipCacheHits,
+			&stats.TotalRequests,
+			&stats.EstimatedCostUSD,
+		)
+		if err != nil {
+			return nil, err
+		}
+		dailyStats = append(dailyStats, stats)
+	}
+	
+	return dailyStats, nil
+}
+
 // Helper function to hash API keys
 func HashAPIKey(key string) string {
 	hash := sha256.Sum256([]byte(key))

@@ -17,7 +17,6 @@ import (
 
 func main() {
 	var (
-		prefix             = flag.String("prefix", "hc", "Prefix for the API key")
 		rateLimitPerSecond = flag.Int("rate-limit", 10, "Rate limit per second")
 	)
 	flag.Parse()
@@ -63,8 +62,11 @@ func main() {
 	}
 	defer db.Close()
 
+	// Generate prefix from user input
+	prefix := fmt.Sprintf("%s_%s_%s", owner, environment, appName)
+	
 	// Generate a secure API key
-	apiKey := generateAPIKey(*prefix)
+	apiKey := generateAPIKey(prefix)
 	keyHash := database.HashAPIKey(apiKey)
 
 	// Create name in format: owner_appname_environment_randomsuffix
@@ -98,7 +100,7 @@ func generateAPIKey(prefix string) string {
 	}
 
 	randomString := hex.EncodeToString(randomBytes)
-	return fmt.Sprintf("%s_live_sk_%s", prefix, randomString)
+	return fmt.Sprintf("%s_%s", prefix, randomString)
 }
 
 func generateRandomString(length int) string {
