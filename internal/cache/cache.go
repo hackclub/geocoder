@@ -10,6 +10,7 @@ import (
 	"github.com/hackclub/geocoder/internal/database"
 	"github.com/hackclub/geocoder/internal/geocoding"
 	"github.com/hackclub/geocoder/internal/geoip"
+	"github.com/hackclub/geocoder/internal/models"
 )
 
 type CacheService struct {
@@ -80,6 +81,38 @@ func (c *CacheService) SetIPResult(ip string, result *geoip.IPInfoResponse) erro
 	}
 
 	return c.db.SetIPCache(ip, string(resultJSON), c.maxIPCacheSize)
+}
+
+// GetStandardGeocodeResult retrieves a cached standard geocoding response
+func (c *CacheService) GetStandardGeocodeResult(address string) (*models.GeocodeAPIResponse, bool) {
+	queryHash := c.hashQuery(address)
+
+	cached, err := c.db.GetAddressCache(queryHash)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, false // Cache miss
+		}
+		return nil, false // Error, treat as cache miss
+	}
+
+	var result models.GeocodeAPIResponse
+	if err := json.Unmarshal([]byte(cached.ResponseData), &result); err != nil {
+		return nil, false // Invalid cached data, treat as cache miss
+	}
+
+	return &result, true // Cache hit
+}
+
+// SetStandardGeocodeResult caches a standard geocoding response
+func (c *CacheService) SetStandardGeocodeResult(address string, result *models.GeocodeAPIResponse) error {
+	queryHash := c.hashQuery(address)
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("failed to marshal standard geocode result: %w", err)
+	}
+
+	return c.db.SetAddressCache(queryHash, address, string(resultJSON), c.maxAddressCacheSize)
 }
 
 func (c *CacheService) hashQuery(query string) string {

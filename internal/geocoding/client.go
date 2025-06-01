@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/hackclub/geocoder/internal/models"
 )
 
 type Client struct {
@@ -94,4 +96,46 @@ func (c *Client) Geocode(address string) (*GeocodeResponse, error) {
 
 func (c *Client) IsConfigured() bool {
 	return c.apiKey != ""
+}
+
+// GeocodeToStandardFormat converts a Google Geocoding API response to our standard format
+func (c *Client) GeocodeToStandardFormat(address string) (*models.GeocodeAPIResponse, error) {
+	googleResp, err := c.Geocode(address)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(googleResp.Results) == 0 {
+		return nil, fmt.Errorf("no results found for address: %s", address)
+	}
+
+	// Use the first result
+	result := googleResp.Results[0]
+
+	// Extract country information from address components
+	var countryName, countryCode string
+	for _, component := range result.AddressComponents {
+		for _, componentType := range component.Types {
+			if componentType == "country" {
+				countryName = component.LongName
+				countryCode = component.ShortName
+				break
+			}
+		}
+		if countryName != "" && countryCode != "" {
+			break
+		}
+	}
+
+	response := &models.GeocodeAPIResponse{
+		Lat:                result.Geometry.Location.Lat,
+		Lng:                result.Geometry.Location.Lng,
+		FormattedAddress:   result.FormattedAddress,
+		CountryName:        countryName,
+		CountryCode:        countryCode,
+		Backend:            "google_geocoding_api",
+		RawBackendResponse: googleResp,
+	}
+
+	return response, nil
 }

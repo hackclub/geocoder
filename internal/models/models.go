@@ -178,3 +178,14 @@ type UsageSummaryResponse struct {
 	PageSize   int                  `json:"page_size"`
 	TotalPages int                  `json:"total_pages"`
 }
+
+// GeocodeAPIResponse represents our standardized geocoding API response
+type GeocodeAPIResponse struct {
+	Lat                  float64     `json:"lat"`
+	Lng                  float64     `json:"lng"`
+	FormattedAddress     string      `json:"formatted_address"`
+	CountryName          string      `json:"country_name"`
+	CountryCode          string      `json:"country_code"`
+	Backend              string      `json:"backend"`
+	RawBackendResponse   interface{} `json:"raw_backend_response"`
+}

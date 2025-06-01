@@ -70,8 +70,8 @@ func (h *Handlers) HandleGeocode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check cache first
-	cached, cacheHit := h.cacheService.GetGeocodeResult(address)
-	var result *geocoding.GeocodeResponse
+	cached, cacheHit := h.cacheService.GetStandardGeocodeResult(address)
+	var result *models.GeocodeAPIResponse
 	var err error
 
 	if cacheHit {
@@ -83,14 +83,14 @@ func (h *Handlers) HandleGeocode(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		result, err = h.geocodeClient.Geocode(address)
+		result, err = h.geocodeClient.GeocodeToStandardFormat(address)
 		if err != nil {
 			h.writeErrorResponse(w, http.StatusBadGateway, "EXTERNAL_API_ERROR", fmt.Sprintf("Failed to geocode address: %v", err))
 			return
 		}
 
 		// Cache the result
-		_ = h.cacheService.SetGeocodeResult(address, result)
+		_ = h.cacheService.SetStandardGeocodeResult(address, result)
 	}
 
 	responseTime := int(time.Since(startTime).Milliseconds())
@@ -103,7 +103,11 @@ func (h *Handlers) HandleGeocode(w http.ResponseWriter, r *http.Request) {
 	if !cacheHit {
 		apiSource = "google"
 	}
-	_ = h.db.LogActivity(apiKey.Name, "v1/geocode", address, len(result.Results), responseTime, apiSource, cacheHit, extractIP(r.RemoteAddr), r.UserAgent())
+	resultCount := 1 // Standard format always returns 1 result when successful
+	if result.Lat == 0 && result.Lng == 0 {
+		resultCount = 0 // No valid coordinates found
+	}
+	_ = h.db.LogActivity(apiKey.Name, "v1/geocode", address, resultCount, responseTime, apiSource, cacheHit, extractIP(r.RemoteAddr), r.UserAgent())
 
 	// Broadcast activity update
 	activity := &models.ActivityLog{
@@ -111,7 +115,7 @@ func (h *Handlers) HandleGeocode(w http.ResponseWriter, r *http.Request) {
 		APIKeyName:     apiKey.Name,
 		Endpoint:       "v1/geocode",
 		QueryText:      address,
-		ResultCount:    len(result.Results),
+		ResultCount:    resultCount,
 		ResponseTimeMs: responseTime,
 		APISource:      apiSource,
 		CacheHit:       cacheHit,
@@ -130,12 +134,11 @@ func (h *Handlers) HandleGeocode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send WebSocket update if there are results
-	if len(result.Results) > 0 {
-		location := result.Results[0].Geometry.Location
+	if result.Lat != 0 || result.Lng != 0 {
 		h.broadcastUpdate(models.WebSocketMessage{
 			Type:      "geocode_request",
-			Lat:       location.Lat,
-			Lng:       location.Lng,
+			Lat:       result.Lat,
+			Lng:       result.Lng,
 			CacheHit:  cacheHit,
 			Endpoint:  "v1/geocode",
 			Address:   address,
