@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/hackclub/geocoder/internal/database"
@@ -143,11 +144,47 @@ func (c *CacheService) SetStandardIPResult(ip string, result *models.GeoIPAPIRes
 	return c.db.SetIPCache(ip, string(resultJSON), c.maxIPCacheSize)
 }
 
-func (c *CacheService) hashQuery(query string) string {
-	// Normalize query: lowercase, trim, collapse spaces
-	normalized := strings.ToLower(strings.TrimSpace(query))
+// normalizeAddress performs conservative address normalization for geocoding cache
+// Only applies transformations that are guaranteed safe for geocoding accuracy
+func (c *CacheService) normalizeAddress(address string) string {
+	// Start with basic trimming and lowercase (SAFE: Google is case-insensitive)
+	normalized := strings.ToLower(strings.TrimSpace(address))
+	
+	// Replace non-standard delimiters with standard comma-space
+	// SAFE: These are clearly delimiter characters, not meaningful address content
+	// Handle: backslashes, pipes, tabs, newlines (but NOT semicolons - they might be meaningful)
+	delimitersRegex := regexp.MustCompile(`[\\|\t\n]+`)
+	normalized = delimitersRegex.ReplaceAllString(normalized, ", ")
+	
+	// Normalize multiple commas to single comma with consistent spacing
+	// SAFE: Improves structure without losing information
+	multiCommaRegex := regexp.MustCompile(`,\s*,+`)
+	normalized = multiCommaRegex.ReplaceAllString(normalized, ", ")
+	
+	// Ensure consistent comma spacing (but preserve commas)
+	// SAFE: Only affects whitespace around commas
+	commaSpaceRegex := regexp.MustCompile(`,\s*`)
+	normalized = commaSpaceRegex.ReplaceAllString(normalized, ", ")
+	
+	// Remove commas at start/end (structural cleanup)
+	// SAFE: Leading/trailing commas don't add meaningful information
+	normalized = strings.Trim(normalized, ", ")
+	
+	// Collapse multiple spaces into single spaces
+	// SAFE: Google handles multiple spaces fine, this is just normalization
 	normalized = strings.Join(strings.Fields(normalized), " ")
+	
+	// Final whitespace cleanup
+	// SAFE: Ensures no leading/trailing spaces remain
+	normalized = strings.TrimSpace(normalized)
+	
+	return normalized
+}
 
+func (c *CacheService) hashQuery(query string) string {
+	// Use address-specific normalization for geocoding queries
+	normalized := c.normalizeAddress(query)
+	
 	hash := sha256.Sum256([]byte(normalized))
 	return fmt.Sprintf("%x", hash)
 }
