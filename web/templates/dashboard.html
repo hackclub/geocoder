@@ -939,7 +939,6 @@
                     <thead>
                         <tr>
                             <th>API Key</th>
-                            <th>Owner</th>
                             <th>Total Requests</th>
                             <th>Cache Hit Rate</th>
                             <th>Est. Cost (USD)</th>
@@ -967,7 +966,7 @@
                             <strong>${keyData.api_key.name}</strong><br>
                             <small style="color: #666;">${keyData.api_key.app_name} (${keyData.api_key.environment})</small>
                         </td>
-                        <td>${keyData.api_key.owner}</td>
+
                         <td>${keyData.total_requests.toLocaleString()}</td>
                         <td>${keyData.cache_hit_rate.toFixed(1)}%</td>
                         <td class="${costClass}">$${keyData.estimated_cost_usd.toFixed(3)}</td>

@@ -68,7 +68,7 @@ func (h *Handlers) HandleGeocode(w http.ResponseWriter, r *http.Request) {
 		h.writeErrorResponse(w, http.StatusUnauthorized, "INVALID_API_KEY", "API key required")
 		return
 	}
-	
+
 	// Check cache first
 	cached, cacheHit := h.cacheService.GetGeocodeResult(address)
 	var result *geocoding.GeocodeResponse
@@ -104,7 +104,7 @@ func (h *Handlers) HandleGeocode(w http.ResponseWriter, r *http.Request) {
 		apiSource = "google"
 	}
 	_ = h.db.LogActivity(apiKey.Name, "v1/geocode", address, len(result.Results), responseTime, apiSource, cacheHit, extractIP(r.RemoteAddr), r.UserAgent())
-	
+
 	// Broadcast activity update
 	activity := &models.ActivityLog{
 		Timestamp:      time.Now(),
@@ -205,7 +205,7 @@ func (h *Handlers) HandleGeoIP(w http.ResponseWriter, r *http.Request) {
 		resultCount = 1
 	}
 	_ = h.db.LogActivity(apiKey.Name, "v1/geoip", ip, resultCount, responseTime, apiSource, cacheHit, extractIP(r.RemoteAddr), r.UserAgent())
-	
+
 	// Broadcast activity update
 	activity := &models.ActivityLog{
 		Timestamp:      time.Now(),
@@ -260,9 +260,9 @@ func (h *Handlers) HandleGeoIP(w http.ResponseWriter, r *http.Request) {
 // Health check endpoint
 func (h *Handlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	status := models.HealthStatus{
-		Timestamp:        time.Now(),
+		Timestamp:         time.Now(),
 		DatabaseConnected: true,
-		Services:         make(map[string]string),
+		Services:          make(map[string]string),
 	}
 
 	// Check database connection
@@ -353,7 +353,7 @@ func (h *Handlers) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 
 	// Auto-generate prefix from user input
 	prefix := fmt.Sprintf("%s_%s_%s", req.Owner, req.AppName, req.Environment)
-	
+
 	// Generate API key
 	apiKey := h.generateAPIKey(prefix)
 	keyHash := database.HashAPIKey(apiKey)
@@ -450,13 +450,13 @@ func (h *Handlers) HandleUsageSummary(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters for pagination
 	page := 1
 	pageSize := 10
-	
+
 	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
 		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
 			page = p
 		}
 	}
-	
+
 	if pageSizeStr := r.URL.Query().Get("page_size"); pageSizeStr != "" {
 		if ps, err := strconv.Atoi(pageSizeStr); err == nil && ps > 0 && ps <= 100 {
 			pageSize = ps
@@ -555,7 +555,7 @@ func (h *Handlers) generateAPIKey(prefix string) string {
 		// Fallback to timestamp if crypto/rand fails
 		return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano()%1000000000)
 	}
-	
+
 	randomString := hex.EncodeToString(randomBytes)
 	return fmt.Sprintf("%s_%s", prefix, randomString)
 }

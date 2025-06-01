@@ -73,7 +73,7 @@ echo "🏃 Running integration tests..."
 echo ""
 
 # Run the integration tests with verbose output
-if go test -tags=integration -v ./tests/ -run TestBasic; then
+if go test -tags=integration -v .; then
     echo ""
     echo "✅ All integration tests passed!"
     

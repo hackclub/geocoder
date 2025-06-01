@@ -21,12 +21,12 @@ func TestHashAPIKey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			hash1 := HashAPIKey(tt.key)
 			hash2 := HashAPIKey(tt.key)
-			
+
 			// Hash should be consistent
 			if hash1 != hash2 {
 				t.Errorf("Hash should be consistent for same input")
 			}
-			
+
 			// Hash should be 64 characters (SHA-256 hex)
 			if len(hash1) != 64 {
 				t.Errorf("Expected hash length 64, got %d", len(hash1))
@@ -38,10 +38,10 @@ func TestHashAPIKey(t *testing.T) {
 func TestHashAPIKey_Different(t *testing.T) {
 	key1 := "test_abc123"
 	key2 := "test_def456"
-	
+
 	hash1 := HashAPIKey(key1)
 	hash2 := HashAPIKey(key2)
-	
+
 	if hash1 == hash2 {
 		t.Error("Different keys should produce different hashes")
 	}
@@ -49,10 +49,10 @@ func TestHashAPIKey_Different(t *testing.T) {
 
 // Mock database implementation for testing
 type mockDatabase struct {
-	apiKeys     map[string]*models.APIKey
+	apiKeys      map[string]*models.APIKey
 	addressCache map[string]*models.AddressCache
-	ipCache     map[string]*models.IPCache
-	stats       *models.Stats
+	ipCache      map[string]*models.IPCache
+	stats        *models.Stats
 }
 
 func newMockDatabase() *mockDatabase {
@@ -62,11 +62,11 @@ func newMockDatabase() *mockDatabase {
 		ipCache:      make(map[string]*models.IPCache),
 		stats: &models.Stats{
 			TotalRequests:       100,
-			CacheHitRate:       75.5,
+			CacheHitRate:        75.5,
 			AverageResponseTime: 150.0,
-			ActiveAPIKeys:      3,
-			TodaysRequests:     25,
-			TodaysCacheHits:    20,
+			ActiveAPIKeys:       3,
+			TodaysRequests:      25,
+			TodaysCacheHits:     20,
 		},
 	}
 }
@@ -188,40 +188,40 @@ func (m *mockDatabase) UpdateCostTracking(date time.Time, geocodeRequests, geoco
 
 func TestMockDatabase_APIKeyOperations(t *testing.T) {
 	db := newMockDatabase()
-	
+
 	// Test creating API key
 	keyHash := HashAPIKey("test_abc123")
 	apiKey, err := db.CreateAPIKey(keyHash, "test-key", "test-owner", "test-app", "dev", 10)
 	if err != nil {
 		t.Fatalf("Failed to create API key: %v", err)
 	}
-	
+
 	if apiKey.Name != "test-key" {
 		t.Errorf("Expected name 'test-key', got '%s'", apiKey.Name)
 	}
-	
+
 	// Test getting API key
 	retrieved, err := db.GetAPIKeyByHash(keyHash)
 	if err != nil {
 		t.Fatalf("Failed to get API key: %v", err)
 	}
-	
+
 	if retrieved.ID != apiKey.ID {
 		t.Errorf("Expected ID '%s', got '%s'", apiKey.ID, retrieved.ID)
 	}
-	
+
 	// Test updating usage
 	err = db.UpdateAPIKeyUsage(apiKey.ID)
 	if err != nil {
 		t.Fatalf("Failed to update API key usage: %v", err)
 	}
-	
+
 	// Test deactivating key
 	err = db.DeactivateAPIKey(apiKey.ID)
 	if err != nil {
 		t.Fatalf("Failed to deactivate API key: %v", err)
 	}
-	
+
 	if apiKey.IsActive {
 		t.Error("API key should be deactivated")
 	}

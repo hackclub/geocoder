@@ -19,11 +19,11 @@ type GeocodeResponse struct {
 }
 
 type GeocodeResult struct {
-	FormattedAddress string                 `json:"formatted_address"`
-	Geometry         GeocodeGeometry        `json:"geometry"`
-	PlaceID          string                 `json:"place_id"`
-	Types            []string               `json:"types"`
-	AddressComponents []AddressComponent    `json:"address_components"`
+	FormattedAddress  string             `json:"formatted_address"`
+	Geometry          GeocodeGeometry    `json:"geometry"`
+	PlaceID           string             `json:"place_id"`
+	Types             []string           `json:"types"`
+	AddressComponents []AddressComponent `json:"address_components"`
 }
 
 type GeocodeGeometry struct {

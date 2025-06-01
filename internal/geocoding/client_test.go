@@ -54,7 +54,7 @@ func TestGeocodeClient_Geocode(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient("test-api-key")
-	
+
 	// We can't easily test the actual geocode method without modifying the URL
 	// This test mainly checks that the client is properly initialized
 	if !client.IsConfigured() {
@@ -64,12 +64,12 @@ func TestGeocodeClient_Geocode(t *testing.T) {
 
 func TestGeocodeClient_NoAPIKey(t *testing.T) {
 	client := NewClient("")
-	
+
 	_, err := client.Geocode("test address")
 	if err == nil {
 		t.Error("Expected error when no API key is configured")
 	}
-	
+
 	expectedError := "Google Geocoding API key not configured"
 	if err.Error() != expectedError {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())

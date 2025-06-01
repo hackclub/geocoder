@@ -89,7 +89,7 @@ func main() {
 
 	// Documentation (no auth required)
 	router.HandleFunc("/", handlers.HandleDocs).Methods("GET")
-	
+
 	// Test interface for map functionality
 	router.HandleFunc("/test", handlers.HandleTestMap).Methods("GET")
 

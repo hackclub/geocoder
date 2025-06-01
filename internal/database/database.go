@@ -322,13 +322,13 @@ func (db *DB) GetRecentActivity() ([]models.ActivityLog, error) {
 		ORDER BY timestamp DESC
 		LIMIT 100
 	`
-	
+
 	rows, err := db.conn.Query(query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var activities []models.ActivityLog
 	for rows.Next() {
 		var activity models.ActivityLog
@@ -350,14 +350,14 @@ func (db *DB) GetRecentActivity() ([]models.ActivityLog, error) {
 		}
 		activities = append(activities, activity)
 	}
-	
+
 	return activities, rows.Err()
 }
 
 // GetAPIKeyUsageSummary returns usage analytics for all API keys with pagination
 func (db *DB) GetAPIKeyUsageSummary(page, pageSize int) (*models.UsageSummaryResponse, error) {
 	offset := (page - 1) * pageSize
-	
+
 	// Get total count first
 	var totalCount int
 	countQuery := "SELECT COUNT(*) FROM api_keys WHERE is_active = true"
@@ -365,7 +365,7 @@ func (db *DB) GetAPIKeyUsageSummary(page, pageSize int) (*models.UsageSummaryRes
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Main query to get API keys with usage stats
 	query := `
 		SELECT 
@@ -387,54 +387,54 @@ func (db *DB) GetAPIKeyUsageSummary(page, pageSize int) (*models.UsageSummaryRes
 		ORDER BY ak.last_used_at DESC NULLS LAST, total_requests DESC
 		LIMIT $1 OFFSET $2
 	`
-	
+
 	rows, err := db.conn.Query(query, pageSize, offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var summaries []models.APIKeyUsageSummary
 	for rows.Next() {
 		var summary models.APIKeyUsageSummary
 		var totalRequests, geocodeRequests, geoipRequests, cacheHits int64
 		var estimatedCost float64
-		
+
 		err := rows.Scan(
-			&summary.APIKey.ID, &summary.APIKey.KeyHash, &summary.APIKey.Name, 
+			&summary.APIKey.ID, &summary.APIKey.KeyHash, &summary.APIKey.Name,
 			&summary.APIKey.Owner, &summary.APIKey.AppName, &summary.APIKey.Environment,
-			&summary.APIKey.IsActive, &summary.APIKey.RateLimitPerSecond, 
+			&summary.APIKey.IsActive, &summary.APIKey.RateLimitPerSecond,
 			&summary.APIKey.CreatedAt, &summary.APIKey.LastUsedAt, &summary.APIKey.RequestCount,
 			&geocodeRequests, &geoipRequests, &cacheHits, &totalRequests, &estimatedCost,
 		)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		summary.TotalRequests = totalRequests
 		summary.GeocodeRequests = geocodeRequests
 		summary.GeoipRequests = geoipRequests
 		summary.CacheHits = cacheHits
 		summary.EstimatedCostUSD = estimatedCost
 		summary.LastUsedAt = summary.APIKey.LastUsedAt
-		
+
 		// Calculate cache hit rate
 		if totalRequests > 0 {
 			summary.CacheHitRate = float64(cacheHits) / float64(totalRequests) * 100
 		}
-		
+
 		// Get daily usage for last 30 days
 		dailyUsage, err := db.getAPIKeyDailyUsage(summary.APIKey.ID)
 		if err != nil {
 			return nil, err
 		}
 		summary.DailyUsage = dailyUsage
-		
+
 		summaries = append(summaries, summary)
 	}
-	
+
 	totalPages := (totalCount + pageSize - 1) / pageSize
-	
+
 	return &models.UsageSummaryResponse{
 		APIKeys:    summaries,
 		TotalCount: totalCount,
@@ -464,13 +464,13 @@ func (db *DB) getAPIKeyDailyUsage(apiKeyID string) ([]models.DailyUsageStats, er
 		GROUP BY DATE(ul.created_at)
 		ORDER BY date DESC
 	`
-	
+
 	rows, err := db.conn.Query(query, apiKeyID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var dailyStats []models.DailyUsageStats
 	for rows.Next() {
 		var stats models.DailyUsageStats
@@ -488,7 +488,7 @@ func (db *DB) getAPIKeyDailyUsage(apiKeyID string) ([]models.DailyUsageStats, er
 		}
 		dailyStats = append(dailyStats, stats)
 	}
-	
+
 	return dailyStats, nil
 }
 

@@ -8,16 +8,16 @@ import (
 func TestLoad(t *testing.T) {
 	// Save original env vars
 	originalVars := map[string]string{
-		"GOOGLE_GEOCODING_API_KEY":     os.Getenv("GOOGLE_GEOCODING_API_KEY"),
-		"IPINFO_API_KEY":               os.Getenv("IPINFO_API_KEY"),
-		"DATABASE_URL":                 os.Getenv("DATABASE_URL"),
-		"PORT":                         os.Getenv("PORT"),
-		"ADMIN_USERNAME":               os.Getenv("ADMIN_USERNAME"),
-		"ADMIN_PASSWORD":               os.Getenv("ADMIN_PASSWORD"),
-		"MAX_ADDRESS_CACHE_SIZE":       os.Getenv("MAX_ADDRESS_CACHE_SIZE"),
-		"MAX_IP_CACHE_SIZE":            os.Getenv("MAX_IP_CACHE_SIZE"),
+		"GOOGLE_GEOCODING_API_KEY":      os.Getenv("GOOGLE_GEOCODING_API_KEY"),
+		"IPINFO_API_KEY":                os.Getenv("IPINFO_API_KEY"),
+		"DATABASE_URL":                  os.Getenv("DATABASE_URL"),
+		"PORT":                          os.Getenv("PORT"),
+		"ADMIN_USERNAME":                os.Getenv("ADMIN_USERNAME"),
+		"ADMIN_PASSWORD":                os.Getenv("ADMIN_PASSWORD"),
+		"MAX_ADDRESS_CACHE_SIZE":        os.Getenv("MAX_ADDRESS_CACHE_SIZE"),
+		"MAX_IP_CACHE_SIZE":             os.Getenv("MAX_IP_CACHE_SIZE"),
 		"DEFAULT_RATE_LIMIT_PER_SECOND": os.Getenv("DEFAULT_RATE_LIMIT_PER_SECOND"),
-		"LOG_LEVEL":                    os.Getenv("LOG_LEVEL"),
+		"LOG_LEVEL":                     os.Getenv("LOG_LEVEL"),
 	}
 
 	// Clean up after test

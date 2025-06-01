@@ -23,7 +23,7 @@ func main() {
 
 	// Interactive prompts for required information
 	reader := bufio.NewReader(os.Stdin)
-	
+
 	fmt.Print("Hack Club staff member username (e.g., zrl): ")
 	owner, err := reader.ReadString('\n')
 	if err != nil {
@@ -64,7 +64,7 @@ func main() {
 
 	// Generate prefix from user input
 	prefix := fmt.Sprintf("%s_%s_%s", owner, environment, appName)
-	
+
 	// Generate a secure API key
 	apiKey := generateAPIKey(prefix)
 	keyHash := database.HashAPIKey(apiKey)

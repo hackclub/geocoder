@@ -85,13 +85,16 @@ func (m *mockCacheDB) GetRecentActivity() ([]models.ActivityLog, error) {
 func (m *mockCacheDB) LogActivity(apiKeyName, endpoint, queryText string, resultCount, responseTimeMs int, apiSource string, cacheHit bool, ipAddress, userAgent string) error {
 	return nil
 }
+func (m *mockCacheDB) GetAPIKeyUsageSummary(page, pageSize int) (*models.UsageSummaryResponse, error) {
+	return nil, nil
+}
 
 func TestCacheService_GeocodeCache(t *testing.T) {
 	db := newMockCacheDB()
 	cache := NewService(db, 1000, 1000)
-	
+
 	address := "1600 Amphitheatre Parkway, Mountain View, CA"
-	
+
 	// Test cache miss
 	result, hit := cache.GetGeocodeResult(address)
 	if hit {
@@ -100,7 +103,7 @@ func TestCacheService_GeocodeCache(t *testing.T) {
 	if result != nil {
 		t.Error("Expected nil result for cache miss")
 	}
-	
+
 	// Create mock geocode result
 	geocodeResult := &geocoding.GeocodeResponse{
 		Results: []geocoding.GeocodeResult{
@@ -116,13 +119,13 @@ func TestCacheService_GeocodeCache(t *testing.T) {
 		},
 		Status: "OK",
 	}
-	
+
 	// Set cache
 	err := cache.SetGeocodeResult(address, geocodeResult)
 	if err != nil {
 		t.Fatalf("Failed to set geocode cache: %v", err)
 	}
-	
+
 	// Test cache hit
 	result, hit = cache.GetGeocodeResult(address)
 	if !hit {
@@ -142,9 +145,9 @@ func TestCacheService_GeocodeCache(t *testing.T) {
 func TestCacheService_IPCache(t *testing.T) {
 	db := newMockCacheDB()
 	cache := NewService(db, 1000, 1000)
-	
+
 	ip := "8.8.8.8"
-	
+
 	// Test cache miss
 	result, hit := cache.GetIPResult(ip)
 	if hit {
@@ -153,7 +156,7 @@ func TestCacheService_IPCache(t *testing.T) {
 	if result != nil {
 		t.Error("Expected nil result for cache miss")
 	}
-	
+
 	// Create mock IP result
 	ipResult := &geoip.IPInfoResponse{
 		IP:       "8.8.8.8",
@@ -165,13 +168,13 @@ func TestCacheService_IPCache(t *testing.T) {
 		Postal:   "94043",
 		Timezone: "America/Los_Angeles",
 	}
-	
+
 	// Set cache
 	err := cache.SetIPResult(ip, ipResult)
 	if err != nil {
 		t.Fatalf("Failed to set IP cache: %v", err)
 	}
-	
+
 	// Test cache hit
 	result, hit = cache.GetIPResult(ip)
 	if !hit {
@@ -188,7 +191,7 @@ func TestCacheService_IPCache(t *testing.T) {
 func TestCacheService_QueryNormalization(t *testing.T) {
 	db := newMockCacheDB()
 	cache := NewService(db, 1000, 1000)
-	
+
 	// These should all produce the same hash
 	addresses := []string{
 		"1600 Amphitheatre Parkway",
@@ -197,7 +200,7 @@ func TestCacheService_QueryNormalization(t *testing.T) {
 		"1600 AMPHITHEATRE PARKWAY",
 		"1600 amphitheatre parkway",
 	}
-	
+
 	// Create mock result
 	geocodeResult := &geocoding.GeocodeResponse{
 		Results: []geocoding.GeocodeResult{
@@ -205,13 +208,13 @@ func TestCacheService_QueryNormalization(t *testing.T) {
 		},
 		Status: "OK",
 	}
-	
+
 	// Cache the first address
 	err := cache.SetGeocodeResult(addresses[0], geocodeResult)
 	if err != nil {
 		t.Fatalf("Failed to set cache: %v", err)
 	}
-	
+
 	// All variations should hit the cache
 	for i, addr := range addresses {
 		result, hit := cache.GetGeocodeResult(addr)
@@ -227,7 +230,7 @@ func TestCacheService_QueryNormalization(t *testing.T) {
 func TestCacheService_InvalidCachedData(t *testing.T) {
 	db := newMockCacheDB()
 	cache := NewService(db, 1000, 1000)
-	
+
 	// Manually insert invalid JSON into the mock cache
 	queryHash := cache.hashQuery("test address")
 	db.addressCache[queryHash] = &models.AddressCache{
@@ -236,7 +239,7 @@ func TestCacheService_InvalidCachedData(t *testing.T) {
 		ResponseData: "invalid json{",
 		CreatedAt:    time.Now(),
 	}
-	
+
 	// Should treat as cache miss due to invalid JSON
 	result, hit := cache.GetGeocodeResult("test address")
 	if hit {

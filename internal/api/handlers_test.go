@@ -23,7 +23,7 @@ func TestHandleHealth(t *testing.T) {
 	geocodeClient := geocoding.NewClient("")
 	geoipClient := geoip.NewClient("")
 	cacheService := cache.NewService(db, 1000, 1000)
-	
+
 	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
 
 	req := httptest.NewRequest("GET", "/health", nil)
@@ -50,7 +50,7 @@ func TestHandleUnsupportedVersion(t *testing.T) {
 	geocodeClient := geocoding.NewClient("")
 	geoipClient := geoip.NewClient("")
 	cacheService := cache.NewService(db, 1000, 1000)
-	
+
 	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
 
 	req := httptest.NewRequest("GET", "/geocode", nil)
@@ -77,12 +77,12 @@ func TestHandleGeocode_MissingAddress(t *testing.T) {
 	geocodeClient := geocoding.NewClient("test-key")
 	geoipClient := geoip.NewClient("")
 	cacheService := cache.NewService(db, 1000, 1000)
-	
+
 	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
 
 	// Create request without address parameter
 	req := httptest.NewRequest("GET", "/v1/geocode", nil)
-	
+
 	// Add mock API key to context
 	apiKey := &models.APIKey{
 		ID:                 "test-id",
@@ -92,7 +92,7 @@ func TestHandleGeocode_MissingAddress(t *testing.T) {
 	}
 	ctx := context.WithValue(req.Context(), middleware.APIKeyContextKey, apiKey)
 	req = req.WithContext(ctx)
-	
+
 	w := httptest.NewRecorder()
 
 	handlers.HandleGeocode(w, req)
@@ -116,7 +116,7 @@ func TestHandleGeocode_NoAPIKey(t *testing.T) {
 	geocodeClient := geocoding.NewClient("")
 	geoipClient := geoip.NewClient("")
 	cacheService := cache.NewService(db, 1000, 1000)
-	
+
 	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
 
 	// Create request with address but no API key in context
@@ -135,12 +135,12 @@ func TestHandleGeoIP_InvalidIP(t *testing.T) {
 	geocodeClient := geocoding.NewClient("")
 	geoipClient := geoip.NewClient("")
 	cacheService := cache.NewService(db, 1000, 1000)
-	
+
 	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
 
 	// Create request with invalid IP
 	req := httptest.NewRequest("GET", "/v1/geoip?ip=invalid-ip", nil)
-	
+
 	// Add mock API key to context
 	apiKey := &models.APIKey{
 		ID:                 "test-id",
@@ -150,7 +150,7 @@ func TestHandleGeoIP_InvalidIP(t *testing.T) {
 	}
 	ctx := context.WithValue(req.Context(), middleware.APIKeyContextKey, apiKey)
 	req = req.WithContext(ctx)
-	
+
 	w := httptest.NewRecorder()
 
 	handlers.HandleGeoIP(w, req)
@@ -174,7 +174,7 @@ func TestHandleAdminKeys_GET(t *testing.T) {
 	geocodeClient := geocoding.NewClient("")
 	geoipClient := geoip.NewClient("")
 	cacheService := cache.NewService(db, 1000, 1000)
-	
+
 	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
 
 	req := httptest.NewRequest("GET", "/admin/keys", nil)
@@ -197,7 +197,7 @@ func TestHandleAdminKeys_POST(t *testing.T) {
 	geocodeClient := geocoding.NewClient("")
 	geoipClient := geoip.NewClient("")
 	cacheService := cache.NewService(db, 1000, 1000)
-	
+
 	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
 
 	reqBody := models.CreateAPIKeyRequest{
@@ -207,7 +207,7 @@ func TestHandleAdminKeys_POST(t *testing.T) {
 		Environment:        "dev",
 		RateLimitPerSecond: 15,
 	}
-	
+
 	jsonBody, _ := json.Marshal(reqBody)
 	req := httptest.NewRequest("POST", "/admin/keys", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -228,8 +228,8 @@ func TestHandleAdminKeys_POST(t *testing.T) {
 		t.Errorf("Expected name 'test-key', got '%s'", response.Name)
 	}
 
-	if !strings.HasPrefix(response.Key, "test-owner_dev_test-app_") {
-		t.Errorf("Expected key to start with 'test-owner_dev_test-app_', got '%s'", response.Key)
+	if !strings.HasPrefix(response.Key, "test-owner_test-app_dev_") {
+		t.Errorf("Expected key to start with 'test-owner_test-app_dev_', got '%s'", response.Key)
 	}
 }
 
@@ -238,7 +238,7 @@ func TestHandleAdminKeys_POST_InvalidJSON(t *testing.T) {
 	geocodeClient := geocoding.NewClient("")
 	geoipClient := geoip.NewClient("")
 	cacheService := cache.NewService(db, 1000, 1000)
-	
+
 	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
 
 	req := httptest.NewRequest("POST", "/admin/keys", strings.NewReader("invalid json"))
@@ -257,7 +257,7 @@ func TestHandleAdminStats(t *testing.T) {
 	geocodeClient := geocoding.NewClient("")
 	geoipClient := geoip.NewClient("")
 	cacheService := cache.NewService(db, 1000, 1000)
-	
+
 	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
 
 	req := httptest.NewRequest("GET", "/admin/stats", nil)
@@ -280,7 +280,7 @@ func TestHandleDocs(t *testing.T) {
 	geocodeClient := geocoding.NewClient("")
 	geoipClient := geoip.NewClient("")
 	cacheService := cache.NewService(db, 1000, 1000)
-	
+
 	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -306,12 +306,12 @@ func TestBroadcastStats(t *testing.T) {
 	geocodeClient := geocoding.NewClient("")
 	geoipClient := geoip.NewClient("")
 	cacheService := cache.NewService(db, 1000, 1000)
-	
+
 	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
 
 	// Test that broadcastStats doesn't panic
 	handlers.broadcastStats()
-	
+
 	// The function should complete without error
 	// We can't easily test the WebSocket broadcast without setting up full WebSocket infrastructure
 	t.Log("broadcastStats completed without error")
@@ -320,8 +320,8 @@ func TestBroadcastStats(t *testing.T) {
 // Mock database for testing
 type mockDB struct{}
 
-func (m *mockDB) Close() error                                     { return nil }
-func (m *mockDB) Ping() error                                      { return nil }
+func (m *mockDB) Close() error { return nil }
+func (m *mockDB) Ping() error  { return nil }
 func (m *mockDB) CreateAPIKey(keyHash, name, owner, appName, environment string, rateLimitPerSecond int) (*models.APIKey, error) {
 	return &models.APIKey{
 		ID:                 "test-id-123",
@@ -339,10 +339,10 @@ func (m *mockDB) CreateAPIKey(keyHash, name, owner, appName, environment string,
 func (m *mockDB) GetAPIKeyByHash(keyHash string) (*models.APIKey, error) {
 	return &models.APIKey{}, nil
 }
-func (m *mockDB) UpdateAPIKeyUsage(keyID string) error           { return nil }
-func (m *mockDB) GetAllAPIKeys() ([]models.APIKey, error)        { return []models.APIKey{}, nil }
+func (m *mockDB) UpdateAPIKeyUsage(keyID string) error                             { return nil }
+func (m *mockDB) GetAllAPIKeys() ([]models.APIKey, error)                          { return []models.APIKey{}, nil }
 func (m *mockDB) UpdateAPIKeyRateLimit(keyID string, rateLimitPerSecond int) error { return nil }
-func (m *mockDB) DeactivateAPIKey(keyID string) error            { return nil }
+func (m *mockDB) DeactivateAPIKey(keyID string) error                              { return nil }
 func (m *mockDB) GetAddressCache(queryHash string) (*models.AddressCache, error) {
 	return nil, nil
 }
@@ -369,4 +369,7 @@ func (m *mockDB) GetRecentActivity() ([]models.ActivityLog, error) {
 }
 func (m *mockDB) LogActivity(apiKeyName, endpoint, queryText string, resultCount, responseTimeMs int, apiSource string, cacheHit bool, ipAddress, userAgent string) error {
 	return nil
+}
+func (m *mockDB) GetAPIKeyUsageSummary(page, pageSize int) (*models.UsageSummaryResponse, error) {
+	return nil, nil
 }

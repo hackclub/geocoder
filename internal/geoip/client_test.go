@@ -47,7 +47,7 @@ func TestGeoIPClient_GetIPInfo(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient("")
-	
+
 	// We can't easily test the actual method without modifying the URL
 	// This test mainly verifies the client initialization
 	if !client.IsConfigured() {

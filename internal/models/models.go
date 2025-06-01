@@ -6,17 +6,17 @@ import (
 
 // APIKey represents an API key in the database
 type APIKey struct {
-	ID                 string    `json:"id" db:"id"`
-	KeyHash            string    `json:"-" db:"key_hash"`
-	Name               string    `json:"name" db:"name"`
-	Owner              string    `json:"owner" db:"owner"`
-	AppName            string    `json:"app_name" db:"app_name"`
-	Environment        string    `json:"environment" db:"environment"`
-	IsActive           bool      `json:"is_active" db:"is_active"`
-	RateLimitPerSecond int       `json:"rate_limit_per_second" db:"rate_limit_per_second"`
-	CreatedAt          time.Time `json:"created_at" db:"created_at"`
+	ID                 string     `json:"id" db:"id"`
+	KeyHash            string     `json:"-" db:"key_hash"`
+	Name               string     `json:"name" db:"name"`
+	Owner              string     `json:"owner" db:"owner"`
+	AppName            string     `json:"app_name" db:"app_name"`
+	Environment        string     `json:"environment" db:"environment"`
+	IsActive           bool       `json:"is_active" db:"is_active"`
+	RateLimitPerSecond int        `json:"rate_limit_per_second" db:"rate_limit_per_second"`
+	CreatedAt          time.Time  `json:"created_at" db:"created_at"`
 	LastUsedAt         *time.Time `json:"last_used_at,omitempty" db:"last_used_at"`
-	RequestCount       int       `json:"request_count" db:"request_count"`
+	RequestCount       int        `json:"request_count" db:"request_count"`
 }
 
 // AddressCache represents a cached geocoding result
@@ -48,12 +48,12 @@ type UsageLog struct {
 
 // CostTracking represents daily cost tracking
 type CostTracking struct {
-	Date               time.Time `json:"date" db:"date"`
-	GeocodeRequests    int       `json:"geocode_requests" db:"geocode_requests"`
-	GeocodeCacheHits   int       `json:"geocode_cache_hits" db:"geocode_cache_hits"`
-	GeoipRequests      int       `json:"geoip_requests" db:"geoip_requests"`
-	GeoipCacheHits     int       `json:"geoip_cache_hits" db:"geoip_cache_hits"`
-	EstimatedCostUSD   float64   `json:"estimated_cost_usd" db:"estimated_cost_usd"`
+	Date             time.Time `json:"date" db:"date"`
+	GeocodeRequests  int       `json:"geocode_requests" db:"geocode_requests"`
+	GeocodeCacheHits int       `json:"geocode_cache_hits" db:"geocode_cache_hits"`
+	GeoipRequests    int       `json:"geoip_requests" db:"geoip_requests"`
+	GeoipCacheHits   int       `json:"geoip_cache_hits" db:"geoip_cache_hits"`
+	EstimatedCostUSD float64   `json:"estimated_cost_usd" db:"estimated_cost_usd"`
 }
 
 // ErrorResponse represents a standard error response
@@ -109,10 +109,10 @@ type WebSocketMessage struct {
 
 // HealthStatus represents the health check response
 type HealthStatus struct {
-	Status           string            `json:"status"`
-	Services         map[string]string `json:"services"`
-	Timestamp        time.Time         `json:"timestamp"`
-	DatabaseConnected bool             `json:"database_connected"`
+	Status            string            `json:"status"`
+	Services          map[string]string `json:"services"`
+	Timestamp         time.Time         `json:"timestamp"`
+	DatabaseConnected bool              `json:"database_connected"`
 }
 
 // ActivityLog represents a recent geocoding activity entry
@@ -132,36 +132,36 @@ type ActivityLog struct {
 
 // Stats represents usage statistics
 type Stats struct {
-	TotalRequests      int64   `json:"total_requests"`
-	CacheHitRate       float64 `json:"cache_hit_rate"`
+	TotalRequests       int64   `json:"total_requests"`
+	CacheHitRate        float64 `json:"cache_hit_rate"`
 	AverageResponseTime float64 `json:"average_response_time_ms"`
-	ActiveAPIKeys      int     `json:"active_api_keys"`
-	TodaysRequests     int64   `json:"todays_requests"`
-	TodaysCacheHits    int64   `json:"todays_cache_hits"`
+	ActiveAPIKeys       int     `json:"active_api_keys"`
+	TodaysRequests      int64   `json:"todays_requests"`
+	TodaysCacheHits     int64   `json:"todays_cache_hits"`
 }
 
 // APIKeyUsageSummary represents usage analytics for an API key
 type APIKeyUsageSummary struct {
-	APIKey             APIKey                `json:"api_key"`
-	TotalRequests      int64                 `json:"total_requests"`
-	GeocodeRequests    int64                 `json:"geocode_requests"`
-	GeoipRequests      int64                 `json:"geoip_requests"`
-	CacheHits          int64                 `json:"cache_hits"`
-	CacheHitRate       float64               `json:"cache_hit_rate"`
-	EstimatedCostUSD   float64               `json:"estimated_cost_usd"`
-	DailyUsage         []DailyUsageStats     `json:"daily_usage"`
-	LastUsedAt         *time.Time            `json:"last_used_at"`
+	APIKey           APIKey            `json:"api_key"`
+	TotalRequests    int64             `json:"total_requests"`
+	GeocodeRequests  int64             `json:"geocode_requests"`
+	GeoipRequests    int64             `json:"geoip_requests"`
+	CacheHits        int64             `json:"cache_hits"`
+	CacheHitRate     float64           `json:"cache_hit_rate"`
+	EstimatedCostUSD float64           `json:"estimated_cost_usd"`
+	DailyUsage       []DailyUsageStats `json:"daily_usage"`
+	LastUsedAt       *time.Time        `json:"last_used_at"`
 }
 
 // DailyUsageStats represents daily usage for an API key
 type DailyUsageStats struct {
-	Date              time.Time `json:"date" db:"date"`
-	GeocodeRequests   int       `json:"geocode_requests" db:"geocode_requests"`
-	GeocodeCacheHits  int       `json:"geocode_cache_hits" db:"geocode_cache_hits"`
-	GeoipRequests     int       `json:"geoip_requests" db:"geoip_requests"`
-	GeoipCacheHits    int       `json:"geoip_cache_hits" db:"geoip_cache_hits"`
-	TotalRequests     int       `json:"total_requests" db:"total_requests"`
-	EstimatedCostUSD  float64   `json:"estimated_cost_usd" db:"estimated_cost_usd"`
+	Date             time.Time `json:"date" db:"date"`
+	GeocodeRequests  int       `json:"geocode_requests" db:"geocode_requests"`
+	GeocodeCacheHits int       `json:"geocode_cache_hits" db:"geocode_cache_hits"`
+	GeoipRequests    int       `json:"geoip_requests" db:"geoip_requests"`
+	GeoipCacheHits   int       `json:"geoip_cache_hits" db:"geoip_cache_hits"`
+	TotalRequests    int       `json:"total_requests" db:"total_requests"`
+	EstimatedCostUSD float64   `json:"estimated_cost_usd" db:"estimated_cost_usd"`
 }
 
 // UsageSummaryRequest represents pagination request for usage summary

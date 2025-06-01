@@ -28,7 +28,7 @@ func NewService(db database.DatabaseInterface, maxAddressCacheSize, maxIPCacheSi
 
 func (c *CacheService) GetGeocodeResult(address string) (*geocoding.GeocodeResponse, bool) {
 	queryHash := c.hashQuery(address)
-	
+
 	cached, err := c.db.GetAddressCache(queryHash)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -47,7 +47,7 @@ func (c *CacheService) GetGeocodeResult(address string) (*geocoding.GeocodeRespo
 
 func (c *CacheService) SetGeocodeResult(address string, result *geocoding.GeocodeResponse) error {
 	queryHash := c.hashQuery(address)
-	
+
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
 		return fmt.Errorf("failed to marshal geocode result: %w", err)
@@ -86,7 +86,7 @@ func (c *CacheService) hashQuery(query string) string {
 	// Normalize query: lowercase, trim, collapse spaces
 	normalized := strings.ToLower(strings.TrimSpace(query))
 	normalized = strings.Join(strings.Fields(normalized), " ")
-	
+
 	hash := sha256.Sum256([]byte(normalized))
 	return fmt.Sprintf("%x", hash)
 }

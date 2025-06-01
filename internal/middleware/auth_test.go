@@ -14,17 +14,17 @@ import (
 func TestBasicAuth(t *testing.T) {
 	username := "admin"
 	password := "secret"
-	
+
 	middleware := BasicAuth(username, password)
-	
+
 	// Create a simple handler to test
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
-	
+
 	wrappedHandler := middleware(handler)
-	
+
 	tests := []struct {
 		name           string
 		username       string
@@ -36,7 +36,7 @@ func TestBasicAuth(t *testing.T) {
 		{"Invalid password", "admin", "wrong", http.StatusUnauthorized},
 		{"Empty credentials", "", "", http.StatusUnauthorized},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/admin", nil)
@@ -44,13 +44,13 @@ func TestBasicAuth(t *testing.T) {
 				req.SetBasicAuth(tt.username, tt.password)
 			}
 			w := httptest.NewRecorder()
-			
+
 			wrappedHandler.ServeHTTP(w, req)
-			
+
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
 			}
-			
+
 			if tt.expectedStatus == http.StatusUnauthorized {
 				authHeader := w.Header().Get("WWW-Authenticate")
 				if authHeader == "" {
@@ -63,18 +63,18 @@ func TestBasicAuth(t *testing.T) {
 
 func TestBasicAuth_NoAuthHeader(t *testing.T) {
 	middleware := BasicAuth("admin", "secret")
-	
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	
+
 	wrappedHandler := middleware(handler)
-	
+
 	req := httptest.NewRequest("GET", "/admin", nil)
 	w := httptest.NewRecorder()
-	
+
 	wrappedHandler.ServeHTTP(w, req)
-	
+
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("Expected status 401, got %d", w.Code)
 	}
@@ -109,34 +109,45 @@ func (m *mockAuthDB) UpdateAPIKeyUsage(keyID string) error {
 	return nil
 }
 
-func (m *mockAuthDB) GetAllAPIKeys() ([]models.APIKey, error) { return nil, nil }
+func (m *mockAuthDB) GetAllAPIKeys() ([]models.APIKey, error)                          { return nil, nil }
 func (m *mockAuthDB) UpdateAPIKeyRateLimit(keyID string, rateLimitPerSecond int) error { return nil }
-func (m *mockAuthDB) DeactivateAPIKey(keyID string) error { return nil }
-func (m *mockAuthDB) GetAddressCache(queryHash string) (*models.AddressCache, error) { return nil, nil }
-func (m *mockAuthDB) SetAddressCache(queryHash, queryText, responseData string, maxCacheSize int) error { return nil }
-func (m *mockAuthDB) GetIPCache(ipAddress string) (*models.IPCache, error) { return nil, nil }
+func (m *mockAuthDB) DeactivateAPIKey(keyID string) error                              { return nil }
+func (m *mockAuthDB) GetAddressCache(queryHash string) (*models.AddressCache, error)   { return nil, nil }
+func (m *mockAuthDB) SetAddressCache(queryHash, queryText, responseData string, maxCacheSize int) error {
+	return nil
+}
+func (m *mockAuthDB) GetIPCache(ipAddress string) (*models.IPCache, error)              { return nil, nil }
 func (m *mockAuthDB) SetIPCache(ipAddress, responseData string, maxCacheSize int) error { return nil }
-func (m *mockAuthDB) LogUsage(apiKeyID, endpoint string, cacheHit bool, responseTimeMs int) error { return nil }
+func (m *mockAuthDB) LogUsage(apiKeyID, endpoint string, cacheHit bool, responseTimeMs int) error {
+	return nil
+}
 func (m *mockAuthDB) GetStats() (*models.Stats, error) { return nil, nil }
-func (m *mockAuthDB) UpdateCostTracking(date time.Time, geocodeRequests, geocodeCacheHits, geoipRequests, geoipCacheHits int, estimatedCost float64) error { return nil }
+func (m *mockAuthDB) UpdateCostTracking(date time.Time, geocodeRequests, geocodeCacheHits, geoipRequests, geoipCacheHits int, estimatedCost float64) error {
+	return nil
+}
 func (m *mockAuthDB) GetRecentActivity() ([]models.ActivityLog, error) { return nil, nil }
-func (m *mockAuthDB) LogActivity(apiKeyName, endpoint, queryText string, resultCount, responseTimeMs int, apiSource string, cacheHit bool, ipAddress, userAgent string) error { return nil }
+func (m *mockAuthDB) LogActivity(apiKeyName, endpoint, queryText string, resultCount, responseTimeMs int, apiSource string, cacheHit bool, ipAddress, userAgent string) error {
+	return nil
+}
+func (m *mockAuthDB) GetAPIKeyUsageSummary(page, pageSize int) (*models.UsageSummaryResponse, error) {
+	return nil, nil
+}
 
 func TestAPIKeyAuth_MissingKey(t *testing.T) {
 	db := newMockAuthDB()
 	middleware := APIKeyAuth(db)
-	
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	
+
 	wrappedHandler := middleware(handler)
-	
+
 	req := httptest.NewRequest("GET", "/v1/geocode", nil)
 	w := httptest.NewRecorder()
-	
+
 	wrappedHandler.ServeHTTP(w, req)
-	
+
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("Expected status 401, got %d", w.Code)
 	}
@@ -145,18 +156,18 @@ func TestAPIKeyAuth_MissingKey(t *testing.T) {
 func TestAPIKeyAuth_InvalidKey(t *testing.T) {
 	db := newMockAuthDB()
 	middleware := APIKeyAuth(db)
-	
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	
+
 	wrappedHandler := middleware(handler)
-	
+
 	req := httptest.NewRequest("GET", "/v1/geocode?key=invalid-key", nil)
 	w := httptest.NewRecorder()
-	
+
 	wrappedHandler.ServeHTTP(w, req)
-	
+
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("Expected status 401, got %d", w.Code)
 	}
@@ -164,7 +175,7 @@ func TestAPIKeyAuth_InvalidKey(t *testing.T) {
 
 func TestAPIKeyAuth_ValidKey(t *testing.T) {
 	db := newMockAuthDB()
-	
+
 	// Add a valid API key to the mock database
 	apiKey := &models.APIKey{
 		ID:                 "test-id",
@@ -174,9 +185,9 @@ func TestAPIKeyAuth_ValidKey(t *testing.T) {
 		RateLimitPerSecond: 10,
 	}
 	db.apiKeys[apiKey.KeyHash] = apiKey
-	
+
 	middleware := APIKeyAuth(db)
-	
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check if API key is in context
 		contextKey := r.Context().Value(APIKeyContextKey)
@@ -185,14 +196,14 @@ func TestAPIKeyAuth_ValidKey(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 	})
-	
+
 	wrappedHandler := middleware(handler)
-	
+
 	req := httptest.NewRequest("GET", "/v1/geocode?key=valid-key", nil)
 	w := httptest.NewRecorder()
-	
+
 	wrappedHandler.ServeHTTP(w, req)
-	
+
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
@@ -200,7 +211,7 @@ func TestAPIKeyAuth_ValidKey(t *testing.T) {
 
 func TestAPIKeyAuth_InactiveKey(t *testing.T) {
 	db := newMockAuthDB()
-	
+
 	// Add an inactive API key to the mock database
 	apiKey := &models.APIKey{
 		ID:                 "test-id",
@@ -210,20 +221,20 @@ func TestAPIKeyAuth_InactiveKey(t *testing.T) {
 		RateLimitPerSecond: 10,
 	}
 	db.apiKeys[apiKey.KeyHash] = apiKey
-	
+
 	middleware := APIKeyAuth(db)
-	
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	
+
 	wrappedHandler := middleware(handler)
-	
+
 	req := httptest.NewRequest("GET", "/v1/geocode?key=inactive-key", nil)
 	w := httptest.NewRecorder()
-	
+
 	wrappedHandler.ServeHTTP(w, req)
-	
+
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("Expected status 401, got %d", w.Code)
 	}
