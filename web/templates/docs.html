@@ -72,6 +72,10 @@
             margin-right: 0.5rem;
         }
         
+        .method.post {
+            background: #28a745;
+        }
+        
         ul, ol {
             margin: 1rem 0;
             padding-left: 1.5rem;
@@ -147,6 +151,24 @@
   "raw_backend_response": { ... }
 }</code></pre>
         <p><strong>Note:</strong> The <code>raw_backend_response</code> contains the complete response from Google Maps Platform Geocoding API. For detailed field documentation, see <a href="https://developers.google.com/maps/documentation/geocoding/requests-geocoding">Google's official documentation</a>.</p>
+    </div>
+    
+    <div class="endpoint">
+        <p><span class="method">GET</span> <code>/v1/geocode_structured</code></p>
+        <p>Convert structured addresses to coordinates using separate address components.</p>
+        <ul>
+            <li><code>key</code> — Your API key</li>
+            <li><code>address_line_1</code> — Primary street address (optional)</li>
+            <li><code>address_line_2</code> — Secondary address (optional)</li>
+            <li><code>city</code> — City name (optional)</li>
+            <li><code>state</code> — State or province (optional)</li>
+            <li><code>postal_code</code> — ZIP or postal code (optional)</li>
+            <li><code>country</code> — Country name (optional)</li>
+        </ul>
+        <pre><code>GET /v1/geocode_structured?address_line_1=1600+Amphitheatre+Parkway&city=Mountain+View&state=CA&postal_code=94043&country=USA&key=your_api_key</code></pre>
+        <p><strong>Note:</strong> All address fields are optional, but at least one must be provided.</p>
+        <p><strong>Response format:</strong> Same as <code>/v1/geocode</code> endpoint</p>
+        <p><strong>Benefits:</strong> Better geocoding accuracy with structured input, easier integration for form-based address collection.</p>
     </div>
     
     <div class="endpoint">

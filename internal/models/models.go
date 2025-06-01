@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 )
 
@@ -204,4 +205,40 @@ type GeoIPAPIResponse struct {
 	Org                string      `json:"org"`
 	Backend            string      `json:"backend"`
 	RawBackendResponse interface{} `json:"raw_backend_response"`
+}
+
+// StructuredAddress represents a structured address for geocoding
+type StructuredAddress struct {
+	AddressLine1 string `json:"address_line_1"`
+	AddressLine2 string `json:"address_line_2"`
+	City         string `json:"city"`
+	State        string `json:"state"`
+	PostalCode   string `json:"postal_code"`
+	Country      string `json:"country"`
+}
+
+// ToFormattedString converts the structured address to a single formatted string for geocoding
+func (sa *StructuredAddress) ToFormattedString() string {
+	var parts []string
+	
+	if sa.AddressLine1 != "" {
+		parts = append(parts, sa.AddressLine1)
+	}
+	if sa.AddressLine2 != "" {
+		parts = append(parts, sa.AddressLine2)
+	}
+	if sa.City != "" {
+		parts = append(parts, sa.City)
+	}
+	if sa.State != "" {
+		parts = append(parts, sa.State)
+	}
+	if sa.PostalCode != "" {
+		parts = append(parts, sa.PostalCode)
+	}
+	if sa.Country != "" {
+		parts = append(parts, sa.Country)
+	}
+	
+	return strings.Join(parts, ", ")
 }

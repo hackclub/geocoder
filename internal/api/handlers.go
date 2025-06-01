@@ -152,6 +152,114 @@ func (h *Handlers) HandleGeocode(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// v1/geocode_structured endpoint
+func (h *Handlers) HandleGeocodeStructured(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+	
+	// Parse structured address from query parameters
+	structuredAddr := models.StructuredAddress{
+		AddressLine1: r.URL.Query().Get("address_line_1"),
+		AddressLine2: r.URL.Query().Get("address_line_2"),
+		City:         r.URL.Query().Get("city"),
+		State:        r.URL.Query().Get("state"),
+		PostalCode:   r.URL.Query().Get("postal_code"),
+		Country:      r.URL.Query().Get("country"),
+	}
+
+	// Validate that at least one field is provided
+	if structuredAddr.AddressLine1 == "" && structuredAddr.AddressLine2 == "" && structuredAddr.City == "" && structuredAddr.State == "" && structuredAddr.PostalCode == "" && structuredAddr.Country == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "INVALID_ADDRESS", "At least one address field is required")
+		return
+	}
+
+	apiKey, ok := r.Context().Value(middleware.APIKeyContextKey).(*models.APIKey)
+	if !ok {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "INVALID_API_KEY", "API key required")
+		return
+	}
+
+	// Convert structured address to formatted string for caching and geocoding
+	address := structuredAddr.ToFormattedString()
+
+	// Check cache first
+	cached, cacheHit := h.cacheService.GetStandardGeocodeResult(address)
+	var result *models.GeocodeAPIResponse
+	var err error
+
+	if cacheHit {
+		result = cached
+	} else {
+		// Make external API call
+		if !h.geocodeClient.IsConfigured() {
+			h.writeErrorResponse(w, http.StatusServiceUnavailable, "EXTERNAL_API_ERROR", "Google Geocoding API not configured")
+			return
+		}
+
+		result, err = h.geocodeClient.GeocodeToStandardFormat(address)
+		if err != nil {
+			h.writeErrorResponse(w, http.StatusBadGateway, "EXTERNAL_API_ERROR", fmt.Sprintf("Failed to geocode address: %v", err))
+			return
+		}
+
+		// Cache the result
+		_ = h.cacheService.SetStandardGeocodeResult(address, result)
+	}
+
+	responseTime := int(time.Since(startTime).Milliseconds())
+
+	// Log usage
+	_ = h.db.LogUsage(apiKey.ID, "v1/geocode_structured", cacheHit, responseTime)
+
+	// Broadcast activity update
+	activity := &models.ActivityLog{
+		Timestamp:      time.Now(),
+		APIKeyName:     apiKey.Name,
+		Endpoint:       "v1/geocode_structured",
+		QueryText:      address,
+		ResultCount:    1,
+		ResponseTimeMs: responseTime,
+		APISource:      "google",
+		CacheHit:       cacheHit,
+		IPAddress:      extractIP(r.RemoteAddr),
+		UserAgent:      r.UserAgent(),
+	}
+	if cacheHit {
+		activity.APISource = "cache"
+	}
+	if result.Lat == 0 && result.Lng == 0 {
+		activity.ResultCount = 0
+	}
+	h.broadcastActivity(activity)
+
+	// Update cost tracking
+	if !cacheHit {
+		today := time.Now().Truncate(24 * time.Hour)
+		_ = h.db.UpdateCostTracking(today, 1, 0, 0, 0, 0.005) // $0.005 per Google API call
+	} else {
+		today := time.Now().Truncate(24 * time.Hour)
+		_ = h.db.UpdateCostTracking(today, 0, 1, 0, 0, 0)
+	}
+
+	// Send WebSocket update if there are results
+	if result.Lat != 0 || result.Lng != 0 {
+		h.broadcastUpdate(models.WebSocketMessage{
+			Type:      "geocode_request",
+			Lat:       result.Lat,
+			Lng:       result.Lng,
+			CacheHit:  cacheHit,
+			Endpoint:  "v1/geocode_structured",
+			Address:   address,
+			Timestamp: time.Now(),
+		})
+	}
+
+	// Broadcast updated stats
+	h.broadcastStats()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
 // v1/geoip endpoint
 func (h *Handlers) HandleGeoIP(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()

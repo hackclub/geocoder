@@ -157,6 +157,67 @@ func TestIntegration_GeocodeEndpoint(t *testing.T) {
 	}
 }
 
+// Test the structured geocoding endpoint  
+func TestIntegration_GeocodeStructuredEndpoint(t *testing.T) {
+	db := &mockIntegrationDB{}
+	db.init()
+	geocodeClient := geocoding.NewClient("")
+	geoipClient := geoip.NewClient("")
+	cacheService := cache.NewService(db, 1000, 1000)
+	handlers := api.NewHandlers(db, geocodeClient, geoipClient, cacheService)
+	rateLimiter := middleware.NewRateLimiter()
+
+	// Create API key for testing
+	testAPIKey := "test_live_sk_123456789"
+	keyHash := database.HashAPIKey(testAPIKey)
+	testKey := &models.APIKey{
+		ID:                 "test-key-id",
+		KeyHash:            keyHash,
+		Name:               "Test Key",
+		IsActive:           true,
+		RateLimitPerSecond: 10,
+	}
+	db.apiKeys[keyHash] = testKey
+
+	router := mux.NewRouter()
+	v1 := router.PathPrefix("/v1").Subrouter()
+	v1.Use(middleware.APIKeyAuth(db))
+	v1.Use(rateLimiter.RateLimit())
+	v1.HandleFunc("/geocode_structured", handlers.HandleGeocodeStructured).Methods("GET")
+
+	// Test missing API key
+	req := httptest.NewRequest("GET", "/v1/geocode_structured?address_line_1=123+Main+St&city=San+Francisco&state=CA&country=USA", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401 for missing API key, got %d", w.Code)
+	}
+
+	// Test empty address (all fields empty)
+	req = httptest.NewRequest("GET", "/v1/geocode_structured?key="+testAPIKey, nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for empty address, got %d", w.Code)
+	}
+
+	// Test valid structured address (will fail because geocoding client not configured)
+	req = httptest.NewRequest("GET", "/v1/geocode_structured?address_line_1=123+Main+St&city=San+Francisco&state=CA&country=USA&key="+testAPIKey, nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("Expected status 503 for unconfigured geocoding client, got %d", w.Code)
+	}
+
+	// Check rate limit headers are present
+	if w.Header().Get("X-RateLimit-Limit") == "" {
+		t.Error("Rate limit headers should be present")
+	}
+}
+
 // Test IP geolocation endpoint
 func TestIntegration_GeoIPEndpoint(t *testing.T) {
 	db := &mockIntegrationDB{}
