@@ -22,6 +22,14 @@ import (
 )
 
 func main() {
+	// Set timezone to Eastern Time
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		log.Fatalf("Failed to load Eastern timezone: %v", err)
+	}
+	time.Local = loc
+	log.Println("Timezone set to Eastern Time (America/New_York)")
+
 	log.Println("Starting Hack Club Geocoder...")
 
 	// Load configuration
