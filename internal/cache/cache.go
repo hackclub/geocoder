@@ -144,6 +144,39 @@ func (c *CacheService) SetStandardIPResult(ip string, result *models.GeoIPAPIRes
 	return c.db.SetIPCache(ip, string(resultJSON), c.maxIPCacheSize)
 }
 
+// GetStandardReverseGeocodeResult retrieves a cached standard reverse geocoding response
+func (c *CacheService) GetStandardReverseGeocodeResult(lat, lng float64) (*models.ReverseGeocodeAPIResponse, bool) {
+	queryHash := c.hashCoordinates(lat, lng)
+
+	cached, err := c.db.GetReverseGeocodeCache(queryHash)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, false // Cache miss
+		}
+		return nil, false // Error, treat as cache miss
+	}
+
+	var result models.ReverseGeocodeAPIResponse
+	if err := json.Unmarshal([]byte(cached.ResponseData), &result); err != nil {
+		return nil, false // Invalid cached data, treat as cache miss
+	}
+
+	return &result, true // Cache hit
+}
+
+// SetStandardReverseGeocodeResult caches a standard reverse geocoding response
+func (c *CacheService) SetStandardReverseGeocodeResult(lat, lng float64, result *models.ReverseGeocodeAPIResponse) error {
+	queryHash := c.hashCoordinates(lat, lng)
+	queryText := fmt.Sprintf("%f,%f", lat, lng)
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("failed to marshal standard reverse geocode result: %w", err)
+	}
+
+	return c.db.SetReverseGeocodeCache(queryHash, queryText, string(resultJSON), c.maxAddressCacheSize)
+}
+
 // normalizeAddress performs conservative address normalization for geocoding cache
 // Only applies transformations that are guaranteed safe for geocoding accuracy
 func (c *CacheService) normalizeAddress(address string) string {
@@ -184,6 +217,15 @@ func (c *CacheService) normalizeAddress(address string) string {
 func (c *CacheService) hashQuery(query string) string {
 	// Use address-specific normalization for geocoding queries
 	normalized := c.normalizeAddress(query)
+	
+	hash := sha256.Sum256([]byte(normalized))
+	return fmt.Sprintf("%x", hash)
+}
+
+func (c *CacheService) hashCoordinates(lat, lng float64) string {
+	// Round coordinates to 5 decimal places for consistent caching
+	// This provides ~1.1m precision which is reasonable for caching
+	normalized := fmt.Sprintf("%.5f,%.5f", lat, lng)
 	
 	hash := sha256.Sum256([]byte(normalized))
 	return fmt.Sprintf("%x", hash)

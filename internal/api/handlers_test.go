@@ -373,3 +373,106 @@ func (m *mockDB) LogActivity(apiKeyName, endpoint, queryText string, resultCount
 func (m *mockDB) GetAPIKeyUsageSummary(page, pageSize int) (*models.UsageSummaryResponse, error) {
 	return nil, nil
 }
+func (m *mockDB) GetReverseGeocodeCache(queryHash string) (*models.ReverseGeocodeCache, error) {
+	return nil, nil
+}
+func (m *mockDB) SetReverseGeocodeCache(queryHash, queryText, responseData string, maxCacheSize int) error {
+	return nil
+}
+
+func TestHandleReverseGeocode_MissingCoordinates(t *testing.T) {
+	db := &mockDB{}
+	geocodeClient := geocoding.NewClient("test-key")
+	geoipClient := geoip.NewClient("")
+	cacheService := cache.NewService(db, 1000, 1000)
+
+	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
+
+	// Create request without lat/lng parameters
+	req := httptest.NewRequest("GET", "/v1/reverse-geocode", nil)
+
+	// Add mock API key to context
+	apiKey := &models.APIKey{
+		ID:                 "test-id",
+		Name:               "test-key",
+		IsActive:           true,
+		RateLimitPerSecond: 10,
+	}
+	ctx := context.WithValue(req.Context(), middleware.APIKeyContextKey, apiKey)
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+
+	handlers.HandleReverseGeocode(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400, got %d", w.Code)
+	}
+
+	var errorResp models.ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &errorResp); err != nil {
+		t.Errorf("Failed to parse error response: %v", err)
+	}
+
+	if errorResp.Error.Code != "INVALID_COORDINATES" {
+		t.Errorf("Expected error code 'INVALID_COORDINATES', got '%s'", errorResp.Error.Code)
+	}
+}
+
+func TestHandleReverseGeocode_InvalidLatitude(t *testing.T) {
+	db := &mockDB{}
+	geocodeClient := geocoding.NewClient("test-key")
+	geoipClient := geoip.NewClient("")
+	cacheService := cache.NewService(db, 1000, 1000)
+
+	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
+
+	// Create request with invalid latitude
+	req := httptest.NewRequest("GET", "/v1/reverse-geocode?lat=invalid&lng=-122.084250", nil)
+
+	// Add mock API key to context
+	apiKey := &models.APIKey{
+		ID:                 "test-id",
+		Name:               "test-key",
+		IsActive:           true,
+		RateLimitPerSecond: 10,
+	}
+	ctx := context.WithValue(req.Context(), middleware.APIKeyContextKey, apiKey)
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+
+	handlers.HandleReverseGeocode(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400, got %d", w.Code)
+	}
+
+	var errorResp models.ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &errorResp); err != nil {
+		t.Errorf("Failed to parse error response: %v", err)
+	}
+
+	if errorResp.Error.Code != "INVALID_COORDINATES" {
+		t.Errorf("Expected error code 'INVALID_COORDINATES', got '%s'", errorResp.Error.Code)
+	}
+}
+
+func TestHandleReverseGeocode_NoAPIKey(t *testing.T) {
+	db := &mockDB{}
+	geocodeClient := geocoding.NewClient("")
+	geoipClient := geoip.NewClient("")
+	cacheService := cache.NewService(db, 1000, 1000)
+
+	handlers := NewHandlers(db, geocodeClient, geoipClient, cacheService)
+
+	// Create request with coordinates but no API key in context
+	req := httptest.NewRequest("GET", "/v1/reverse-geocode?lat=37.422476&lng=-122.084250", nil)
+	w := httptest.NewRecorder()
+
+	handlers.HandleReverseGeocode(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401, got %d", w.Code)
+	}
+}

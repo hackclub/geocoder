@@ -12,14 +12,16 @@ import (
 
 // Mock database for cache testing
 type mockCacheDB struct {
-	addressCache map[string]*models.AddressCache
-	ipCache      map[string]*models.IPCache
+	addressCache        map[string]*models.AddressCache
+	ipCache             map[string]*models.IPCache
+	reverseGeocodeCache map[string]*models.ReverseGeocodeCache
 }
 
 func newMockCacheDB() *mockCacheDB {
 	return &mockCacheDB{
-		addressCache: make(map[string]*models.AddressCache),
-		ipCache:      make(map[string]*models.IPCache),
+		addressCache:        make(map[string]*models.AddressCache),
+		ipCache:             make(map[string]*models.IPCache),
+		reverseGeocodeCache: make(map[string]*models.ReverseGeocodeCache),
 	}
 }
 
@@ -66,6 +68,24 @@ func (m *mockCacheDB) SetIPCache(ipAddress, responseData string, maxCacheSize in
 	m.ipCache[ipAddress] = &models.IPCache{
 		ID:           len(m.ipCache) + 1,
 		IPAddress:    ipAddress,
+		ResponseData: responseData,
+		CreatedAt:    time.Now(),
+	}
+	return nil
+}
+
+func (m *mockCacheDB) GetReverseGeocodeCache(queryHash string) (*models.ReverseGeocodeCache, error) {
+	if cache, exists := m.reverseGeocodeCache[queryHash]; exists {
+		return cache, nil
+	}
+	return nil, sql.ErrNoRows
+}
+
+func (m *mockCacheDB) SetReverseGeocodeCache(queryHash, queryText, responseData string, maxCacheSize int) error {
+	m.reverseGeocodeCache[queryHash] = &models.ReverseGeocodeCache{
+		ID:           len(m.reverseGeocodeCache) + 1,
+		QueryHash:    queryHash,
+		QueryText:    queryText,
 		ResponseData: responseData,
 		CreatedAt:    time.Now(),
 	}
@@ -247,5 +267,92 @@ func TestCacheService_InvalidCachedData(t *testing.T) {
 	}
 	if result != nil {
 		t.Error("Expected nil result for invalid cached data")
+	}
+}
+
+func TestCacheService_ReverseGeocodeCache(t *testing.T) {
+	db := newMockCacheDB()
+	cache := NewService(db, 1000, 1000)
+
+	lat, lng := 37.4224764, -122.0842499
+
+	// Test cache miss
+	result, hit := cache.GetStandardReverseGeocodeResult(lat, lng)
+	if hit {
+		t.Error("Expected cache miss for new coordinates")
+	}
+	if result != nil {
+		t.Error("Expected nil result for cache miss")
+	}
+
+	// Create mock reverse geocode result
+	reverseGeocodeResult := &models.ReverseGeocodeAPIResponse{
+		Lat:              lat,
+		Lng:              lng,
+		FormattedAddress: "1600 Amphitheatre Parkway, Mountain View, CA 94043, USA",
+		CountryName:      "United States",
+		CountryCode:      "US",
+		Backend:          "google_maps_platform_geocoding",
+	}
+
+	// Set cache
+	err := cache.SetStandardReverseGeocodeResult(lat, lng, reverseGeocodeResult)
+	if err != nil {
+		t.Fatalf("Failed to set reverse geocode cache: %v", err)
+	}
+
+	// Test cache hit
+	result, hit = cache.GetStandardReverseGeocodeResult(lat, lng)
+	if !hit {
+		t.Error("Expected cache hit for cached coordinates")
+	}
+	if result == nil {
+		t.Fatal("Expected non-nil result for cache hit")
+	}
+	if result.FormattedAddress != "1600 Amphitheatre Parkway, Mountain View, CA 94043, USA" {
+		t.Errorf("Expected specific formatted address, got '%s'", result.FormattedAddress)
+	}
+	if result.Lat != lat {
+		t.Errorf("Expected lat %f, got %f", lat, result.Lat)
+	}
+	if result.Lng != lng {
+		t.Errorf("Expected lng %f, got %f", lng, result.Lng)
+	}
+}
+
+func TestCacheService_ReverseGeocodeCoordinateNormalization(t *testing.T) {
+	db := newMockCacheDB()
+	cache := NewService(db, 1000, 1000)
+
+	// These coordinates should all produce the same hash due to rounding to 5 decimal places
+	coordinates := [][]float64{
+		{37.422476, -122.084250},   // Base coordinates
+		{37.4224764, -122.0842499}, // Slight variations that round to the same 5 decimal value
+		{37.4224759, -122.0842501}, // More variations that round to the same value
+	}
+
+	// Create mock result
+	reverseGeocodeResult := &models.ReverseGeocodeAPIResponse{
+		Lat:              37.422476,
+		Lng:              -122.084250,
+		FormattedAddress: "Test Address",
+		Backend:          "google_maps_platform_geocoding",
+	}
+
+	// Cache the first coordinates
+	err := cache.SetStandardReverseGeocodeResult(coordinates[0][0], coordinates[0][1], reverseGeocodeResult)
+	if err != nil {
+		t.Fatalf("Failed to set cache: %v", err)
+	}
+
+	// All coordinate variations should hit the cache
+	for i, coord := range coordinates {
+		result, hit := cache.GetStandardReverseGeocodeResult(coord[0], coord[1])
+		if !hit {
+			t.Errorf("Coordinate variation %d should hit cache: %f, %f", i, coord[0], coord[1])
+		}
+		if result == nil || result.FormattedAddress != "Test Address" {
+			t.Errorf("Coordinate variation %d should return valid result", i)
+		}
 	}
 }

@@ -132,6 +132,12 @@ func (m *mockAuthDB) LogActivity(apiKeyName, endpoint, queryText string, resultC
 func (m *mockAuthDB) GetAPIKeyUsageSummary(page, pageSize int) (*models.UsageSummaryResponse, error) {
 	return nil, nil
 }
+func (m *mockAuthDB) GetReverseGeocodeCache(queryHash string) (*models.ReverseGeocodeCache, error) {
+	return nil, nil
+}
+func (m *mockAuthDB) SetReverseGeocodeCache(queryHash, queryText, responseData string, maxCacheSize int) error {
+	return nil
+}
 
 func TestAPIKeyAuth_MissingKey(t *testing.T) {
 	db := newMockAuthDB()

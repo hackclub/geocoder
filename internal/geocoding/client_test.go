@@ -75,3 +75,75 @@ func TestGeocodeClient_NoAPIKey(t *testing.T) {
 		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
 	}
 }
+
+func TestReverseGeocodeClient_ReverseGeocode(t *testing.T) {
+	// Mock Google Reverse Geocoding API response
+	mockResponse := `{
+		"results": [
+			{
+				"formatted_address": "1600 Amphitheatre Parkway, Mountain View, CA 94043, USA",
+				"geometry": {
+					"location": {
+						"lat": 37.4224764,
+						"lng": -122.0842499
+					},
+					"location_type": "ROOFTOP"
+				},
+				"place_id": "ChIJ2eUgeAK6j4ARbn5u_wAGqWA",
+				"types": ["street_address"],
+				"address_components": [
+					{
+						"long_name": "United States",
+						"short_name": "US",
+						"types": ["country", "political"]
+					}
+				]
+			}
+		],
+		"status": "OK"
+	}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(mockResponse))
+	}))
+	defer server.Close()
+
+	client := NewClient("test-api-key")
+
+	// We can't easily test the actual reverse geocode method without modifying the URL
+	// This test mainly checks that the client is properly initialized for reverse geocoding
+	if !client.IsConfigured() {
+		t.Error("Client should be configured with API key")
+	}
+}
+
+func TestReverseGeocodeClient_NoAPIKey(t *testing.T) {
+	client := NewClient("")
+
+	_, err := client.ReverseGeocode(37.4224764, -122.0842499)
+	if err == nil {
+		t.Error("Expected error when no API key is configured")
+	}
+
+	expectedError := "Google Geocoding API key not configured"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
+	}
+}
+
+func TestReverseGeocodeClient_ToStandardFormat(t *testing.T) {
+	client := NewClient("")
+
+	// Test with no API key - should return error
+	_, err := client.ReverseGeocodeToStandardFormat(37.4224764, -122.0842499)
+	if err == nil {
+		t.Error("Expected error when no API key is configured")
+	}
+
+	expectedError := "Google Geocoding API key not configured"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
+	}
+}

@@ -149,7 +149,7 @@ func (h *Handlers) HandleGeocode(w http.ResponseWriter, r *http.Request) {
 	h.broadcastStats()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	h.writeJSONResponse(w, result)
 }
 
 // v1/geocode_structured endpoint
@@ -257,7 +257,126 @@ func (h *Handlers) HandleGeocodeStructured(w http.ResponseWriter, r *http.Reques
 	h.broadcastStats()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	h.writeJSONResponse(w, result)
+}
+
+// v1/reverse-geocode endpoint
+func (h *Handlers) HandleReverseGeocode(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+	latStr := r.URL.Query().Get("lat")
+	lngStr := r.URL.Query().Get("lng")
+	
+	if latStr == "" || lngStr == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "INVALID_COORDINATES", "Both lat and lng parameters are required")
+		return
+	}
+
+	// Parse coordinates
+	lat, err := strconv.ParseFloat(latStr, 64)
+	if err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "INVALID_COORDINATES", "Invalid latitude value")
+		return
+	}
+	
+	lng, err := strconv.ParseFloat(lngStr, 64)
+	if err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, "INVALID_COORDINATES", "Invalid longitude value")
+		return
+	}
+
+	// Validate coordinate ranges
+	if lat < -90 || lat > 90 {
+		h.writeErrorResponse(w, http.StatusBadRequest, "INVALID_COORDINATES", "Latitude must be between -90 and 90")
+		return
+	}
+	if lng < -180 || lng > 180 {
+		h.writeErrorResponse(w, http.StatusBadRequest, "INVALID_COORDINATES", "Longitude must be between -180 and 180")
+		return
+	}
+
+	apiKey, ok := r.Context().Value(middleware.APIKeyContextKey).(*models.APIKey)
+	if !ok {
+		h.writeErrorResponse(w, http.StatusUnauthorized, "INVALID_API_KEY", "API key required")
+		return
+	}
+
+	// Check cache first
+	cached, cacheHit := h.cacheService.GetStandardReverseGeocodeResult(lat, lng)
+	var result *models.ReverseGeocodeAPIResponse
+	
+	if cacheHit {
+		result = cached
+	} else {
+		// Make external API call
+		if !h.geocodeClient.IsConfigured() {
+			h.writeErrorResponse(w, http.StatusServiceUnavailable, "EXTERNAL_API_ERROR", "Google Geocoding API not configured")
+			return
+		}
+
+		result, err = h.geocodeClient.ReverseGeocodeToStandardFormat(lat, lng)
+		if err != nil {
+			h.writeErrorResponse(w, http.StatusBadGateway, "EXTERNAL_API_ERROR", fmt.Sprintf("Failed to reverse geocode coordinates: %v", err))
+			return
+		}
+
+		// Cache the result
+		_ = h.cacheService.SetStandardReverseGeocodeResult(lat, lng, result)
+	}
+
+	responseTime := int(time.Since(startTime).Milliseconds())
+
+	// Log usage
+	_ = h.db.LogUsage(apiKey.ID, "v1/reverse_geocode", cacheHit, responseTime)
+
+	// Log activity
+	apiSource := "cache"
+	if !cacheHit {
+		apiSource = "google"
+	}
+	resultCount := 1 // Standard format always returns 1 result when successful
+	queryText := fmt.Sprintf("%f,%f", lat, lng)
+	_ = h.db.LogActivity(apiKey.Name, "v1/reverse_geocode", queryText, resultCount, responseTime, apiSource, cacheHit, extractIP(r.RemoteAddr), r.UserAgent())
+
+	// Broadcast activity update
+	activity := &models.ActivityLog{
+		Timestamp:      time.Now(),
+		APIKeyName:     apiKey.Name,
+		Endpoint:       "v1/reverse_geocode",
+		QueryText:      queryText,
+		ResultCount:    resultCount,
+		ResponseTimeMs: responseTime,
+		APISource:      apiSource,
+		CacheHit:       cacheHit,
+		IPAddress:      extractIP(r.RemoteAddr),
+		UserAgent:      r.UserAgent(),
+	}
+	h.broadcastActivity(activity)
+
+	// Update cost tracking
+	if !cacheHit {
+		today := time.Now().Truncate(24 * time.Hour)
+		_ = h.db.UpdateCostTracking(today, 1, 0, 0, 0, 0.005) // $0.005 per Google API call (same as forward geocoding)
+	} else {
+		today := time.Now().Truncate(24 * time.Hour)
+		_ = h.db.UpdateCostTracking(today, 0, 1, 0, 0, 0)
+	}
+
+	// Send WebSocket update
+	h.broadcastUpdate(models.WebSocketMessage{
+		Type:      "reverse_geocode_request",
+		Lat:       lat,
+		Lng:       lng,
+		CacheHit:  cacheHit,
+		Endpoint:  "v1/reverse_geocode",
+		Address:   result.FormattedAddress,
+		Timestamp: time.Now(),
+	})
+
+	// Broadcast updated stats
+	h.broadcastStats()
+
+	w.Header().Set("Content-Type", "application/json")
+	h.writeJSONResponse(w, result)
 }
 
 // v1/geoip endpoint
@@ -357,7 +476,7 @@ func (h *Handlers) HandleGeoIP(w http.ResponseWriter, r *http.Request) {
 	h.broadcastStats()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	h.writeJSONResponse(w, result)
 }
 
 // Health check endpoint
@@ -407,7 +526,7 @@ func (h *Handlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	h.writeJSONResponse(w, status)
 }
 
 // Admin endpoints
@@ -435,7 +554,7 @@ func (h *Handlers) handleGetAPIKeys(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(keys)
+	h.writeJSONResponse(w, keys)
 }
 
 func (h *Handlers) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
@@ -484,7 +603,7 @@ func (h *Handlers) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	h.writeJSONResponse(w, response)
 }
 
 func (h *Handlers) HandleUpdateAPIKeyRateLimit(w http.ResponseWriter, r *http.Request) {
@@ -535,7 +654,7 @@ func (h *Handlers) HandleAdminStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	h.writeJSONResponse(w, stats)
 }
 
 func (h *Handlers) HandleAdminActivity(w http.ResponseWriter, r *http.Request) {
@@ -546,7 +665,7 @@ func (h *Handlers) HandleAdminActivity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(activities)
+	h.writeJSONResponse(w, activities)
 }
 
 func (h *Handlers) HandleUsageSummary(w http.ResponseWriter, r *http.Request) {
@@ -573,7 +692,7 @@ func (h *Handlers) HandleUsageSummary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(summary)
+	h.writeJSONResponse(w, summary)
 }
 
 // WebSocket handling
@@ -679,7 +798,14 @@ func (h *Handlers) writeErrorResponse(w http.ResponseWriter, statusCode int, err
 		},
 	}
 
-	json.NewEncoder(w).Encode(errorResp)
+	h.writeJSONResponse(w, errorResp)
+}
+
+// writeJSONResponse writes a JSON response with nice formatting
+func (h *Handlers) writeJSONResponse(w http.ResponseWriter, data interface{}) {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	encoder.Encode(data)
 }
 
 // extractIP extracts the IP address from a RemoteAddr string (removes port if present)

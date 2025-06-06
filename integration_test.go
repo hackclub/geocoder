@@ -285,6 +285,85 @@ func TestIntegration_GeoIPEndpoint(t *testing.T) {
 	}
 }
 
+// Test reverse geocoding endpoint  
+func TestIntegration_ReverseGeocodeEndpoint(t *testing.T) {
+	db := &mockIntegrationDB{}
+	geocodeClient := geocoding.NewClient("")
+	geoipClient := geoip.NewClient("")
+	cacheService := cache.NewService(db, 1000, 1000)
+	handlers := api.NewHandlers(db, geocodeClient, geoipClient, cacheService)
+
+	// Initialize the mock database
+	db.init()
+	
+	// Create API key for testing
+	testAPIKey := "test-key"
+	keyHash := database.HashAPIKey(testAPIKey)
+	apiKey := &models.APIKey{
+		ID:                 "test-key-id",
+		KeyHash:            keyHash,
+		Name:               "Test Key",
+		IsActive:           true,
+		RateLimitPerSecond: 10,
+	}
+	db.apiKeys[keyHash] = apiKey
+
+	router := mux.NewRouter()
+	v1 := router.PathPrefix("/v1").Subrouter()
+	v1.Use(middleware.APIKeyAuth(db))
+	v1.HandleFunc("/reverse_geocode", handlers.HandleReverseGeocode).Methods("GET")
+
+	// Test valid coordinates
+	req := httptest.NewRequest("GET", "/v1/reverse_geocode?lat=37.422476&lng=-122.084250&key=test-key", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	// Test valid request (will fail because geocoding client not configured)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("Expected status 503 for unconfigured geocoding client, got %d", w.Code)
+	}
+
+	// Test missing coordinates
+	req = httptest.NewRequest("GET", "/v1/reverse_geocode?key=test-key", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for missing coordinates, got %d", w.Code)
+	}
+
+	// Test invalid latitude
+	req = httptest.NewRequest("GET", "/v1/reverse_geocode?lat=invalid&lng=-122.084250&key=test-key", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for invalid latitude, got %d", w.Code)
+	}
+
+	// Test coordinate range validation
+	req = httptest.NewRequest("GET", "/v1/reverse_geocode?lat=91&lng=-122.084250&key=test-key", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for latitude out of range, got %d", w.Code)
+	}
+
+	// Test without API key
+	req = httptest.NewRequest("GET", "/v1/reverse_geocode?lat=37.422476&lng=-122.084250", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401 for missing API key, got %d", w.Code)
+	}
+
+	// Cleanup
+	_ = apiKey
+}
+
 // Test rate limiting functionality
 func TestIntegration_RateLimit(t *testing.T) {
 	db := &mockIntegrationDB{}
@@ -639,11 +718,13 @@ func TestIntegration_ErrorFormats(t *testing.T) {
 
 // Comprehensive mock database for integration testing
 type mockIntegrationDB struct {
-	apiKeys               map[string]*models.APIKey
-	addressCache          map[string]*models.AddressCache
-	ipCache               map[string]*models.IPCache
-	addressEvictionCalled bool
-	ipEvictionCalled      bool
+	apiKeys                     map[string]*models.APIKey
+	addressCache                map[string]*models.AddressCache
+	ipCache                     map[string]*models.IPCache
+	reverseGeocodeCache         map[string]*models.ReverseGeocodeCache
+	addressEvictionCalled       bool
+	ipEvictionCalled            bool
+	reverseGeocodeEvictionCalled bool
 }
 
 func (m *mockIntegrationDB) init() {
@@ -655,6 +736,9 @@ func (m *mockIntegrationDB) init() {
 	}
 	if m.ipCache == nil {
 		m.ipCache = make(map[string]*models.IPCache)
+	}
+	if m.reverseGeocodeCache == nil {
+		m.reverseGeocodeCache = make(map[string]*models.ReverseGeocodeCache)
 	}
 }
 
@@ -824,6 +908,37 @@ func (m *mockIntegrationDB) GetAPIKeyUsageSummary(page, pageSize int) (*models.U
 		PageSize:   pageSize,
 		TotalPages: 0,
 	}, nil
+}
+
+func (m *mockIntegrationDB) GetReverseGeocodeCache(queryHash string) (*models.ReverseGeocodeCache, error) {
+	m.init()
+	if cache, exists := m.reverseGeocodeCache[queryHash]; exists {
+		return cache, nil
+	}
+	return nil, fmt.Errorf("no rows")
+}
+
+func (m *mockIntegrationDB) SetReverseGeocodeCache(queryHash, queryText, responseData string, maxCacheSize int) error {
+	m.init()
+	
+	// Simulate eviction when hitting max size
+	if len(m.reverseGeocodeCache) >= maxCacheSize {
+		m.reverseGeocodeEvictionCalled = true
+		// Remove one entry to simulate eviction
+		for k := range m.reverseGeocodeCache {
+			delete(m.reverseGeocodeCache, k)
+			break
+		}
+	}
+	
+	m.reverseGeocodeCache[queryHash] = &models.ReverseGeocodeCache{
+		ID:           len(m.reverseGeocodeCache) + 1,
+		QueryHash:    queryHash,
+		QueryText:    queryText,
+		ResponseData: responseData,
+		CreatedAt:    time.Now(),
+	}
+	return nil
 }
 
 // Helper function for max

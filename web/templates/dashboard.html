@@ -324,6 +324,7 @@
         }
         
         .activity-icon.geocode { background: #3498db; }
+        .activity-icon.reverse-geocode { background: #e67e22; }
         .activity-icon.geoip { background: #9b59b6; }
         .activity-icon.cache { background: #27ae60; }
         
@@ -861,8 +862,9 @@
             item.className = 'activity-item';
             
             const isGeocode = activity.endpoint === 'v1/geocode';
-            const iconClass = activity.cache_hit ? 'cache' : (isGeocode ? 'geocode' : 'geoip');
-            const iconText = activity.cache_hit ? '⚡' : (isGeocode ? 'GEO' : 'IP');
+            const isReverseGeocode = activity.endpoint === 'v1/reverse_geocode';
+            const iconClass = activity.cache_hit ? 'cache' : (isGeocode ? 'geocode' : (isReverseGeocode ? 'reverse-geocode' : 'geoip'));
+            const iconText = activity.cache_hit ? '⚡' : (isGeocode ? 'GEO' : (isReverseGeocode ? 'REV' : 'IP'));
             
             const timestamp = new Date(activity.timestamp);
             const timeStr = timestamp.toLocaleTimeString();

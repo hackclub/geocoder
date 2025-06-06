@@ -37,6 +37,15 @@ type IPCache struct {
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 
+// ReverseGeocodeCache represents a cached reverse geocoding result
+type ReverseGeocodeCache struct {
+	ID           int       `json:"id" db:"id"`
+	QueryHash    string    `json:"query_hash" db:"query_hash"`
+	QueryText    string    `json:"query_text" db:"query_text"`
+	ResponseData string    `json:"response_data" db:"response_data"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+}
+
 // UsageLog represents a usage log entry
 type UsageLog struct {
 	ID             int64     `json:"id" db:"id"`
@@ -205,6 +214,22 @@ type GeoIPAPIResponse struct {
 	Org                string      `json:"org"`
 	Backend            string      `json:"backend"`
 	RawBackendResponse interface{} `json:"raw_backend_response"`
+}
+
+// ReverseGeocodeAPIResponse represents our standardized reverse geocoding API response
+type ReverseGeocodeAPIResponse struct {
+	Lat                  float64     `json:"lat"`
+	Lng                  float64     `json:"lng"`
+	FormattedAddress     string      `json:"formatted_address"`
+	AddressLine1         string      `json:"address_line_1"`
+	City                 string      `json:"city"`
+	State                string      `json:"state"`
+	StateFull            string      `json:"state_full"`
+	PostalCode           string      `json:"postal_code"`
+	CountryName          string      `json:"country_name"`
+	CountryCode          string      `json:"country_code"`
+	Backend              string      `json:"backend"`
+	RawBackendResponse   interface{} `json:"raw_backend_response"`
 }
 
 // StructuredAddress represents a structured address for geocoding

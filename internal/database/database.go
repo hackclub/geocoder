@@ -230,6 +230,61 @@ func (db *DB) SetIPCache(ipAddress, responseData string, maxCacheSize int) error
 	return err
 }
 
+func (db *DB) GetReverseGeocodeCache(queryHash string) (*models.ReverseGeocodeCache, error) {
+	var cache models.ReverseGeocodeCache
+	query := `
+		SELECT id, query_hash, query_text, response_data, created_at
+		FROM reverse_geocode_cache
+		WHERE query_hash = $1
+	`
+	err := db.conn.QueryRow(query, queryHash).Scan(
+		&cache.ID, &cache.QueryHash, &cache.QueryText, &cache.ResponseData, &cache.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &cache, nil
+}
+
+func (db *DB) SetReverseGeocodeCache(queryHash, queryText, responseData string, maxCacheSize int) error {
+	// Insert new cache entry
+	insertQuery := `
+		INSERT INTO reverse_geocode_cache (query_hash, query_text, response_data)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (query_hash) DO UPDATE SET
+			response_data = EXCLUDED.response_data,
+			created_at = NOW()
+	`
+	_, err := db.conn.Exec(insertQuery, queryHash, queryText, responseData)
+	if err != nil {
+		return err
+	}
+
+	// Check if we need to evict old entries
+	var count int
+	countQuery := `SELECT COUNT(*) FROM reverse_geocode_cache`
+	err = db.conn.QueryRow(countQuery).Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	if count >= maxCacheSize {
+		// Delete oldest 10% of entries
+		deleteCount := maxCacheSize / 10
+		deleteQuery := `
+			DELETE FROM reverse_geocode_cache
+			WHERE id IN (
+				SELECT id FROM reverse_geocode_cache
+				ORDER BY created_at ASC
+				LIMIT $1
+			)
+		`
+		_, err = db.conn.Exec(deleteQuery, deleteCount)
+	}
+
+	return err
+}
+
 // Usage tracking
 func (db *DB) LogUsage(apiKeyID, endpoint string, cacheHit bool, responseTimeMs int) error {
 	query := `

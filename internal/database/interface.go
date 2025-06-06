@@ -24,6 +24,8 @@ type DatabaseInterface interface {
 	SetAddressCache(queryHash, queryText, responseData string, maxCacheSize int) error
 	GetIPCache(ipAddress string) (*models.IPCache, error)
 	SetIPCache(ipAddress, responseData string, maxCacheSize int) error
+	GetReverseGeocodeCache(queryHash string) (*models.ReverseGeocodeCache, error)
+	SetReverseGeocodeCache(queryHash, queryText, responseData string, maxCacheSize int) error
 
 	// Usage tracking
 	LogUsage(apiKeyID, endpoint string, cacheHit bool, responseTimeMs int) error

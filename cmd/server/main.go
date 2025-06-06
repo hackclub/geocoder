@@ -74,6 +74,7 @@ func main() {
 	v1.Use(rateLimiter.RateLimit())
 	v1.HandleFunc("/geocode", handlers.HandleGeocode).Methods("GET")
 	v1.HandleFunc("/geocode_structured", handlers.HandleGeocodeStructured).Methods("GET")
+	v1.HandleFunc("/reverse_geocode", handlers.HandleReverseGeocode).Methods("GET")
 	v1.HandleFunc("/geoip", handlers.HandleGeoIP).Methods("GET")
 
 	// Admin routes (with basic auth)
