@@ -11,6 +11,8 @@ func main() {
 		"lat":               37.4223,
 		"lng":               -122.0844,
 		"formatted_address": "1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA",
+		"state_name":        "California",
+		"state_code":        "CA",
 		"country_name":      "United States",
 		"country_code":      "US",
 		"backend":           "google_maps_platform_geocoding",

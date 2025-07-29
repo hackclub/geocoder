@@ -112,18 +112,17 @@ func (c *Client) GeocodeToStandardFormat(address string) (*models.GeocodeAPIResp
 	// Use the first result
 	result := googleResp.Results[0]
 
-	// Extract country information from address components
-	var countryName, countryCode string
+	// Extract country and state information from address components
+	var countryName, countryCode, stateName, stateCode string
 	for _, component := range result.AddressComponents {
 		for _, componentType := range component.Types {
 			if componentType == "country" {
 				countryName = component.LongName
 				countryCode = component.ShortName
-				break
+			} else if componentType == "administrative_area_level_1" {
+				stateName = component.LongName
+				stateCode = component.ShortName
 			}
-		}
-		if countryName != "" && countryCode != "" {
-			break
 		}
 	}
 
@@ -131,6 +130,8 @@ func (c *Client) GeocodeToStandardFormat(address string) (*models.GeocodeAPIResp
 		Lat:                result.Geometry.Location.Lat,
 		Lng:                result.Geometry.Location.Lng,
 		FormattedAddress:   result.FormattedAddress,
+		StateName:          stateName,
+		StateCode:          stateCode,
 		CountryName:        countryName,
 		CountryCode:        countryCode,
 		Backend:            "google_maps_platform_geocoding",

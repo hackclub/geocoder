@@ -194,6 +194,8 @@ type GeocodeAPIResponse struct {
 	Lat                  float64     `json:"lat"`
 	Lng                  float64     `json:"lng"`
 	FormattedAddress     string      `json:"formatted_address"`
+	StateName            string      `json:"state_name"`
+	StateCode            string      `json:"state_code"`
 	CountryName          string      `json:"country_name"`
 	CountryCode          string      `json:"country_code"`
 	Backend              string      `json:"backend"`

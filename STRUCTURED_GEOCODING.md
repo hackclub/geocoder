@@ -29,6 +29,8 @@ Returns the same response format as the standard geocoding endpoint:
   "lat": 37.7749,
   "lng": -122.4194,
   "formatted_address": "123 Main St, Apt 4B, San Francisco, CA 94102, USA",
+  "state_name": "California",
+  "state_code": "CA",
   "country_name": "United States",
   "country_code": "US",
   "backend": "google_maps_platform_geocoding",
